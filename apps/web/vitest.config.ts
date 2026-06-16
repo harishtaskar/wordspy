@@ -12,5 +12,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    // A real origin so localStorage/sessionStorage are functional (not opaque).
+    environmentOptions: { jsdom: { url: "http://localhost:3000" } },
   },
 });

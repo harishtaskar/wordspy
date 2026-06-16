@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { safeStorage } from "@/lib/safeStorage";
 
 interface SessionState {
   /** Ephemeral per-browser-session id (no account). */
@@ -27,7 +28,7 @@ export const usePlayerSession = create<SessionState>()(
     }),
     {
       name: "wordspy.session",
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => safeStorage("session")),
     },
   ),
 );

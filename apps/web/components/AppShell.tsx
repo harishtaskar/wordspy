@@ -1,13 +1,15 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 
 /**
- * Brutalist app shell + live connection. Mobile-first single column; desktop
- * centers the same ~420px column as a framed poster. [DESIGN.md Layout / EXPERIENCE.md Responsive]
+ * Brutalist app frame: header (wordmark + live connection) + a centered column.
+ * Mobile-first single column; desktop centers the same ~420px column as a
+ * framed poster. [DESIGN.md Layout / EXPERIENCE.md Responsive]
  */
-export function AppShell() {
+export function AppShell({ children }: { children: ReactNode }) {
   useSocket();
 
   return (
@@ -22,21 +24,7 @@ export function AppShell() {
           </h1>
           <ConnectionIndicator />
         </header>
-
-        <section className="border-[3px] border-ink bg-surface p-[14px] shadow-[var(--shadow-hero)]">
-          <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-muted">
-            Secret Word Agent
-          </p>
-          <p
-            className="mt-1 text-[28px] uppercase leading-none tracking-tight text-crew"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Ready
-          </p>
-          <p className="mt-2 text-[13px]">
-            Foundation online. Rooms, roles, and voting arrive in later stories.
-          </p>
-        </section>
+        {children}
       </div>
     </main>
   );

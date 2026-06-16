@@ -1,6 +1,11 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import {
   PROTOCOL_VERSION,
+  CATEGORIES,
+  DISCUSSION_TIMES,
+  MAX_PLAYERS_OPTIONS,
+  DEFAULT_ROOM_SETTINGS,
+  validateUsername,
   type HeartbeatAck,
   type HealthResponse,
   type ClientToServerEvents,
@@ -24,8 +29,30 @@ describe("@wordspy/types contract", () => {
     expectTypeOf(res.status).toEqualTypeOf<"ok">();
   });
 
-  it("event maps declare the heartbeat + welcome events", () => {
+  it("event maps declare the heartbeat + welcome + room events", () => {
     expectTypeOf<ClientToServerEvents>().toHaveProperty("heartbeat");
+    expectTypeOf<ClientToServerEvents>().toHaveProperty("room:create");
+    expectTypeOf<ClientToServerEvents>().toHaveProperty("room:join");
+    expectTypeOf<ClientToServerEvents>().toHaveProperty("room:setReady");
+    expectTypeOf<ClientToServerEvents>().toHaveProperty("room:kick");
+    expectTypeOf<ClientToServerEvents>().toHaveProperty("room:start");
+    expectTypeOf<ClientToServerEvents>().toHaveProperty("room:leave");
     expectTypeOf<ServerToClientEvents>().toHaveProperty("server:welcome");
+    expectTypeOf<ServerToClientEvents>().toHaveProperty("room:state");
+    expectTypeOf<ServerToClientEvents>().toHaveProperty("room:kicked");
+  });
+
+  it("room option lists are non-empty and defaults are members of them", () => {
+    expect(CATEGORIES.length).toBe(7);
+    expect(CATEGORIES).toContain(DEFAULT_ROOM_SETTINGS.category);
+    expect(DISCUSSION_TIMES).toContain(DEFAULT_ROOM_SETTINGS.discussionSeconds);
+    expect(MAX_PLAYERS_OPTIONS).toContain(DEFAULT_ROOM_SETTINGS.maxPlayers);
+  });
+
+  it("validateUsername normalizes, length-checks, and blocks the blocklist", () => {
+    expect(validateUsername("  Rex  the Cat ")).toEqual({ ok: true, value: "Rex the Cat" });
+    expect(validateUsername("A").ok).toBe(false);
+    expect(validateUsername("admin").ok).toBe(false);
+    expect(validateUsername(42 as unknown).ok).toBe(false);
   });
 });

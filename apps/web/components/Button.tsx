@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 type Variant = "primary" | "crew" | "imposter" | "ghost";
 
@@ -17,20 +17,20 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * Brutalist button: 3px ink border, hard shadow, uppercase 800.
  * Press collapses the shadow and nudges +2,+2 (stamp feel). [DESIGN.md Components]
  */
-export function Button({
-  variant = "primary",
-  className = "",
-  children,
-  ...rest
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = "primary", className = "", children, ...rest },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       className={[
         "border-[3px] border-ink px-4 py-3 font-extrabold uppercase tracking-tight",
         "shadow-[var(--shadow-button)] transition-all",
         "active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
         "focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink",
         "min-h-[44px]",
+        "disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none",
         variantClass[variant] ?? variantClass.primary,
         className,
       ].join(" ")}
@@ -39,4 +39,4 @@ export function Button({
       {children}
     </button>
   );
-}
+});

@@ -1,0 +1,24 @@
+{
+  "name": "wordspy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Secret Word Agent — multiplayer social deduction party game",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:types": "npm run build --workspace @wordspy/types",
+    "prebuild": "npm run build:types",
+    "pretest": "npm run build:types",
+    "dev:server": "npm run dev --workspace @wordspy/server",
+    "dev:web": "npm run dev --workspace @wordspy/web",
+    "dev": "npm run build:types && concurrently -n server,web -c blue,magenta \"npm run dev:server\" \"npm run dev:web\"",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2"
+  }
+}

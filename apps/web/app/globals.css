@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/*
+ * DESIGN.md tokens (ux-designs/ux-wordspy-2026-06-16/DESIGN.md).
+ * Neo-brutalism: zero radius, 3px ink borders, hard offset shadows.
+ * Font vars (--font-display / --font-body) are injected by next/font in layout.tsx.
+ */
+@theme {
+  --color-bg: #fffdf7;
+  --color-surface: #ffffff;
+  --color-ink: #111111;
+  --color-crew: #1763e8;
+  --color-imposter: #ff5436;
+  --color-accent: #ffd23f;
+  --color-success: #0fa968;
+  --color-muted: #6b6357;
+
+  --radius-none: 0px;
+
+  --shadow-card: 4px 4px 0 #111111;
+  --shadow-hero: 8px 8px 0 #111111;
+  --shadow-button: 4px 4px 0 #111111;
+
+  --font-display: var(--font-archivo-black), "Arial Black", system-ui, sans-serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+* {
+  border-radius: 0 !important;
+}

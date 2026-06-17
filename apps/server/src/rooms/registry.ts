@@ -150,6 +150,11 @@ export function removePlayer(code: string, id: string): RemovePlayerResult {
 
   const wasHost = room.hostId === id;
   room.players.delete(id);
+  room.votes.delete(id); // drop any vote they had cast (stale otherwise)
+  // Drop votes that targeted the leaver too, so the tally stays consistent.
+  for (const [voter, target] of room.votes) {
+    if (target === id) room.votes.delete(voter);
+  }
 
   if (room.players.size === 0) {
     if (room.timer) clearTimeout(room.timer); // don't fire on a freed room
@@ -173,6 +178,7 @@ export function kickPlayer(code: string, hostId: string, targetId: string): Kick
   const room = rooms.get(code);
   if (!room) return { ok: false, error: "Room not found." };
   if (room.hostId !== hostId) return { ok: false, error: "Only the host can kick." };
+  if (room.phase !== "lobby") return { ok: false, error: "Can't kick mid-match." };
   if (targetId === hostId) return { ok: false, error: "You can't kick yourself." };
   if (!room.players.has(targetId)) return { ok: false, error: "Player not in room." };
   room.players.delete(targetId);
@@ -293,8 +299,9 @@ export function nextAfterResult(room: Room): "round2" | "terminal" {
   return "terminal";
 }
 
-/** Record the winning side, compute scores, and end the match. */
+/** Record the winning side, compute scores, and end the match. Idempotent. */
 export function setWinner(room: Room, winner: GameWinner): void {
+  if (room.winner) return; // already decided — don't let a race overwrite it
   room.winner = winner;
   room.phase = "game-over";
   const scores = computeScores(room); // PRD §10

@@ -14,6 +14,12 @@ export const POINTS = {
 /**
  * Pure per-match scoring from the tracked room facts (PRD §10). Returns a map
  * of playerId → score. Called by `setWinner` at game-over.
+ *
+ * Intentional design choices (confirmed 2026-06-17, code review):
+ *   - Crew survive-round is +20 PER round survived (so a 2-round survivor = +40),
+ *     not a flat +20. Rewards lasting longer.
+ *   - The crew win bonus (+150) goes to EVERY crew member when Crew wins,
+ *     including those eliminated mid-match (team-win feel).
  */
 export function computeScores(room: Room): Record<string, number> {
   const roundsPlayed = room.round;

@@ -208,6 +208,33 @@ describe("kickPlayer", () => {
     const room = roomWith3();
     expect(kickPlayer(room.code, "host", "ghost")).toMatchObject({ ok: false });
   });
+  it("rejects a kick once the match has started (lobby-only)", () => {
+    const room = roomWith3();
+    room.phase = "discussion";
+    expect(kickPlayer(room.code, "host", "p2")).toMatchObject({ ok: false });
+    expect(room.players.has("p2")).toBe(true);
+  });
+});
+
+describe("review fixes (2026-06-17)", () => {
+  it("setWinner is idempotent — a race can't overwrite the winner", () => {
+    const room = createRoom({ id: "host", username: "Aanya" }, DEFAULT_ROOM_SETTINGS);
+    setWinner(room, "imposter");
+    setWinner(room, "crew"); // late/racing call
+    expect(room.winner).toBe("imposter");
+  });
+
+  it("removePlayer drops the leaver's vote and votes targeting them", () => {
+    const room = createRoom({ id: "host", username: "Aanya" }, DEFAULT_ROOM_SETTINGS);
+    addPlayer(room.code, { id: "p2", username: "Rex" });
+    addPlayer(room.code, { id: "p3", username: "Mo" });
+    room.phase = "voting";
+    castVote(room.code, "p2", "host"); // p2 → host
+    castVote(room.code, "host", "p2"); // host → p2
+    removePlayer(room.code, "p2");
+    expect(room.votes.has("p2")).toBe(false); // p2's own vote gone
+    expect(room.votes.has("host")).toBe(false); // host's vote (targeting p2) also gone
+  });
 });
 
 describe("startGame", () => {

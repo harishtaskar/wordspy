@@ -45,6 +45,8 @@ const CHAT_MIN_INTERVAL_MS = 750;
 const RESULT_REVEAL_MS = 5000;
 /** How long the caught Imposter has to make a final guess (ms). */
 const FINAL_GUESS_MS = 20000;
+/** Hard voting deadline — guarantees a round resolves even if someone never votes. */
+const VOTE_MS = 30000;
 
 /**
  * Server-authoritative phase clock. Sets `phaseEndsAt` for the current phase and
@@ -59,20 +61,79 @@ function scheduleNextPhase(room: Room, io: GameIOServer): void {
     room.timer = undefined;
     return;
   }
+  const fromPhase = room.phase;
   room.phaseEndsAt = Date.now() + plan.durationMs;
   room.timer = setTimeout(() => {
     const current = getRoom(room.code);
-    if (!current) return; // room was deleted — do nothing
+    if (!current || current.phase !== fromPhase) return; // stale (phase already moved)
     current.phase = plan.next;
     if (plan.next === "voting") {
       current.votes.clear(); // fresh tally each voting round
       current.voteResult = undefined;
       current.revote = false;
+      startVotingTimer(current, io);
+    } else {
+      scheduleNextPhase(current, io);
     }
-    scheduleNextPhase(current, io);
     io.to(current.code).emit("room:state", toSummary(current));
   }, plan.durationMs);
   // Don't let a pending phase timer keep the process (or a test runner) alive.
+  room.timer.unref?.();
+}
+
+/** A hard voting deadline: when it expires, resolve with whatever votes are in. */
+function startVotingTimer(room: Room, io: GameIOServer): void {
+  if (room.timer) clearTimeout(room.timer);
+  room.phaseEndsAt = Date.now() + VOTE_MS;
+  room.timer = setTimeout(() => {
+    const current = getRoom(room.code);
+    if (!current || current.phase !== "voting") return;
+    resolveVotingRound(current, io);
+    io.to(current.code).emit("room:state", toSummary(current));
+  }, VOTE_MS);
+  room.timer.unref?.();
+}
+
+/** Resolve the round once every active player has voted (or call directly to force it). */
+function maybeResolveVoting(room: Room, io: GameIOServer): void {
+  if (room.phase !== "voting") return;
+  const active = activePlayers(room).length;
+  if (active > 0 && room.votes.size >= active) {
+    resolveVotingRound(room, io);
+  }
+}
+
+/** Tally the voting round; a tie → another timed re-vote, else → the result advance. */
+function resolveVotingRound(room: Room, io: GameIOServer): void {
+  const outcome = resolveRound(room);
+  if (outcome.kind === "revote") {
+    startVotingTimer(room, io); // the re-vote gets its own deadline
+    return;
+  }
+  scheduleResultAdvance(room, io);
+}
+
+/** After the reveal window, go to Round 2 (quorum-guarded) or a terminal end state. */
+function scheduleResultAdvance(room: Room, io: GameIOServer): void {
+  if (room.timer) clearTimeout(room.timer);
+  room.timer = setTimeout(() => {
+    const current = getRoom(room.code);
+    if (!current || current.phase !== "result") return;
+    const activeCrew = activePlayers(current).filter((p) => p.id !== current.imposterId);
+    if (nextAfterResult(current) === "round2") {
+      if (activeCrew.length === 0) {
+        setWinner(current, "imposter"); // no crew left to continue
+      } else {
+        startRound2(current);
+        scheduleNextPhase(current, io); // discussion → voting
+      }
+    } else {
+      resolveTerminal(current); // → final-guess (imposter caught) or game-over
+      // Imposter caught ⇒ final-guess phase ⇒ start their 20s clock.
+      if (current.voteResult?.wasImposter) startFinalGuess(current, io);
+    }
+    io.to(current.code).emit("room:state", toSummary(current));
+  }, RESULT_REVEAL_MS);
   room.timer.unref?.();
 }
 
@@ -168,6 +229,10 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
         if (typeof ack === "function") ack({ ok: false, error: result.error });
         return;
       }
+      if (findRoomsForSocket(socket.id).length > 0) {
+        if (typeof ack === "function") ack({ ok: false, error: "You're already in a room." });
+        return;
+      }
       try {
         const room = createRoom({ id: socket.id, username: result.username }, result.settings);
         socket.join(room.code);
@@ -188,6 +253,11 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
         if (typeof ack === "function") ack({ ok: false, error: valid.error });
         return;
       }
+      const existing = findRoomsForSocket(socket.id);
+      if (existing.length > 0 && !existing.includes(valid.code)) {
+        if (typeof ack === "function") ack({ ok: false, error: "You're already in a room." });
+        return;
+      }
       const result = addPlayer(valid.code, { id: socket.id, username: valid.username });
       if (!result.ok) {
         if (typeof ack === "function") ack({ ok: false, error: result.error });
@@ -204,6 +274,11 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
     socket.on("room:setReady", (req, ack) => {
       const code = typeof req?.code === "string" ? req.code.trim().toUpperCase() : "";
       const ready = typeof req?.ready === "boolean" ? req.ready : false;
+      const existing = getRoom(code);
+      if (existing && existing.phase !== "lobby") {
+        if (typeof ack === "function") ack({ ok: false, error: "Ready only in the lobby." });
+        return;
+      }
       const room = setReady(code, socket.id, ready);
       if (!room) {
         if (typeof ack === "function") ack({ ok: false, error: "Not in this room." });
@@ -296,6 +371,8 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       const result = removePlayer(code, socket.id);
       socket.leave(code);
       if (!result.deleted && result.room) {
+        // A departing voter may have completed (or unblocked) the round.
+        maybeResolveVoting(result.room, io);
         io.to(code).emit("room:state", toSummary(result.room));
         console.log(`[room] ${socket.id} left ${code}; host=${result.room.hostId}`);
       } else {
@@ -338,28 +415,8 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
         return;
       }
       const room = result.room;
-      // Resolve once every active player has voted (Story 3.2).
-      if (room.votes.size >= activePlayers(room).length) {
-        const outcome = resolveRound(room); // tally → suspect → maybe eliminate
-        // After a closed round (not a re-vote), advance after the reveal window:
-        // round 2 (3.4) or a terminal end state (4.1).
-        if (outcome.kind === "result") {
-          if (room.timer) clearTimeout(room.timer);
-          room.timer = setTimeout(() => {
-            const current = getRoom(room.code);
-            if (!current) return;
-            if (nextAfterResult(current) === "round2") {
-              startRound2(current);
-              scheduleNextPhase(current, io); // discussion → voting
-            } else {
-              resolveTerminal(current); // → final-guess or game-over (winner)
-              if (current.phase === "final-guess") startFinalGuess(current, io);
-            }
-            io.to(current.code).emit("room:state", toSummary(current));
-          }, RESULT_REVEAL_MS);
-          room.timer.unref?.();
-        }
-      }
+      // Resolve once every active player has voted (or the deadline fires).
+      maybeResolveVoting(room, io);
       const summary = toSummary(room);
       if (typeof ack === "function") ack({ ok: true, data: summary });
       io.to(code).emit("room:state", summary);

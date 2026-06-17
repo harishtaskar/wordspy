@@ -565,3 +565,64 @@ describe("imposter disconnect insta-win (4.3)", () => {
     expect(getRoom(code)!.phase).toBe("discussion");
   });
 });
+
+describe("review fixes — voting deadlock + multi-room (2026-06-17)", () => {
+  let c2: Socket<ServerToClientEvents, ClientToServerEvents> | undefined;
+  let c3: Socket<ServerToClientEvents, ClientToServerEvents> | undefined;
+  afterEach(() => {
+    c2?.close();
+    c3?.close();
+    c2 = c3 = undefined;
+  });
+
+  it("resolves the voting round when the last non-voter disconnects (no deadlock)", async () => {
+    const port = await listen();
+    client = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => client!.on("connect", () => r()));
+    const created = await new Promise<AckResponse<RoomSummary>>((r) =>
+      client!.emit("room:create", { username: "Aanya", settings: DEFAULT_ROOM_SETTINGS }, r),
+    );
+    if (!created.ok) throw new Error("create");
+    const code = created.data.code;
+    c2 = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => c2!.on("connect", () => r()));
+    const j2 = await new Promise<AckResponse<RoomSummary>>((r) => c2!.emit("room:join", { code, username: "Rex" }, r));
+    c3 = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => c3!.on("connect", () => r()));
+    const j3 = await new Promise<AckResponse<RoomSummary>>((r) => c3!.emit("room:join", { code, username: "Mo" }, r));
+    if (!j2.ok || !j3.ok) throw new Error("join");
+    const rexId = j2.data.players.find((p) => p.username === "Rex")!.id;
+    const moId = j3.data.players.find((p) => p.username === "Mo")!.id;
+
+    const room = getRoom(code)!;
+    room.phase = "voting";
+    room.imposterId = rexId;
+
+    // host + Mo vote; Rex never votes, then disconnects → round must still resolve.
+    const resolved = new Promise<RoomSummary>((resolve) =>
+      c3!.on("room:state", (rm) => (rm.phase === "result" || rm.phase === "game-over") && resolve(rm)),
+    );
+    client!.emit("vote:cast", { code, targetId: moId });
+    c3!.emit("vote:cast", { code, targetId: moId });
+    // Now active = {host, Rex, Mo} = 3, votes = 2. Rex leaves → active 2, votes 2 → resolves.
+    c2!.close();
+
+    const rs = await resolved;
+    expect(["result", "game-over"]).toContain(rs.phase);
+  });
+
+  it("rejects joining a second room while already in one", async () => {
+    const port = await listen();
+    client = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => client!.on("connect", () => r()));
+    const a = await new Promise<AckResponse<RoomSummary>>((r) =>
+      client!.emit("room:create", { username: "Aanya", settings: DEFAULT_ROOM_SETTINGS }, r),
+    );
+    if (!a.ok) throw new Error("create");
+    // Same socket creates another room → rejected.
+    const dup = await new Promise<AckResponse<RoomSummary>>((r) =>
+      client!.emit("room:create", { username: "Aanya", settings: DEFAULT_ROOM_SETTINGS }, r),
+    );
+    expect(dup.ok).toBe(false);
+  });
+});

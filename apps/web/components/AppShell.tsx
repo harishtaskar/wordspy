@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { ConnectionIndicator } from "./ConnectionIndicator";
+import { BackgroundDecor } from "./BackgroundDecor";
 
 /**
  * Brutalist app frame: header (wordmark + live connection) + a centered column.
@@ -13,8 +14,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   useSocket();
 
   return (
-    <main className="flex min-h-dvh w-full items-center justify-center bg-bg p-4">
-      <div className="flex w-full max-w-[420px] flex-col gap-4">
+    <main className="relative flex min-h-dvh w-full items-center justify-center bg-bg p-4">
+      <BackgroundDecor />
+      <div className="relative z-10 flex w-full max-w-[420px] flex-col gap-4">
         <header className="flex items-center justify-between">
           <h1
             className="text-[24px] uppercase leading-none tracking-tight"

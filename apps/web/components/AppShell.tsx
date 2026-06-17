@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { BackgroundDecor } from "./BackgroundDecor";
+import { InfoMenu } from "./InfoMenu";
 
 /**
  * Brutalist app frame: header (wordmark + live connection) + a centered column.
@@ -29,6 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
         {children}
       </div>
+      <InfoMenu />
     </main>
   );
 }

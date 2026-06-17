@@ -546,6 +546,7 @@ describe("imposter disconnect insta-win (4.3)", () => {
     const rs = await over;
     expect(rs.phase).toBe("game-over");
     expect(rs.winner).toBe("crew");
+    expect(rs.winReason).toBe("imposter-left");
   });
 
   it("does NOT end the match when a non-imposter disconnects", async () => {

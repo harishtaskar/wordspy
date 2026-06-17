@@ -473,6 +473,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
         if (room && inProgress && room.imposterId === socket.id) {
           // Imposter quit mid-match → instant Crew win (FR24).
           if (room.timer) clearTimeout(room.timer);
+          room.winReason = "imposter-left";
           setWinner(room, "crew");
           removePlayer(code, socket.id); // drop the imposter from the roster
           const after = getRoom(code);

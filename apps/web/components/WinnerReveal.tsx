@@ -46,6 +46,15 @@ export function WinnerReveal({ room }: { room: RoomSummary }) {
         </p>
       </div>
 
+      {room.winReason === "imposter-left" && (
+        <div role="status" className="border-[3px] border-ink bg-accent px-3 py-2 text-center">
+          <p className="text-[13px] font-extrabold uppercase">🚪 The Imposter bailed</p>
+          <p className="mt-1 text-[12px] font-bold">
+            They quit mid-match — Crew wins by forfeit. No final guess.
+          </p>
+        </div>
+      )}
+
       <div className="flex gap-3">
         <div className="flex-1 border-[3px] border-ink bg-surface p-3 text-center shadow-[var(--shadow-card)]">
           <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-muted">The word</p>

@@ -5,6 +5,7 @@ import type {
   RoomPhase,
   VoteResult,
   GameWinner,
+  WinReason,
 } from "@wordspy/types";
 import { MIN_PLAYERS } from "@wordspy/types";
 import { generateRoomCode } from "../lib/roomCode.js";
@@ -66,6 +67,8 @@ export interface Room {
   revote: boolean;
   /** Winning side, set at `game-over`. */
   winner?: GameWinner;
+  /** Why the match ended (for the reveal screen). */
+  winReason?: WinReason;
   /** Round the imposter was caught (undefined = never), for scoring. */
   imposterCaughtRound?: number;
   /** Crew who voted the imposter in the catching round (correct-vote bonus). */
@@ -359,6 +362,7 @@ export function resetForRematch(room: Room): void {
   room.voteResult = undefined;
   room.revote = false;
   room.winner = undefined;
+  room.winReason = undefined;
   room.secretWord = undefined;
   room.imposterId = undefined;
   room.imposterUsername = undefined;
@@ -450,6 +454,7 @@ export function toSummary(room: Room): RoomSummary {
     voteResult: room.voteResult,
     revote: room.revote,
     winner: room.winner,
+    winReason: room.winReason,
     // Secret word + imposter identity are revealed ONLY at game-over.
     revealedWord: isOver ? room.secretWord : undefined,
     revealedImposter: isOver

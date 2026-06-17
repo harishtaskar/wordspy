@@ -88,6 +88,9 @@ export type RoomPhase =
 /** Winning side of a finished match. */
 export type GameWinner = "crew" | "imposter";
 
+/** Why the match ended a particular way (for the reveal screen). */
+export type WinReason = "imposter-left";
+
 /** Aggregate count of votes for one target (not who voted — anonymity preserved). */
 export interface VoteTally {
   playerId: string;
@@ -152,6 +155,8 @@ export interface RoomSummary {
   revote: boolean;
   /** Winning side, set only at `game-over`. */
   winner?: GameWinner;
+  /** Why the match ended (e.g. the imposter quit), for the reveal screen. */
+  winReason?: WinReason;
   /** The secret word — revealed ONLY at `game-over`. */
   revealedWord?: string;
   /** The Imposter's username — revealed ONLY at `game-over`. */

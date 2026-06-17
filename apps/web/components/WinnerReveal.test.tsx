@@ -53,6 +53,12 @@ describe("WinnerReveal", () => {
     expect(screen.getByText(/imposter wins/i)).toBeTruthy();
   });
 
+  it("explains a forfeit win when the imposter left", () => {
+    render(<WinnerReveal room={{ ...room, winReason: "imposter-left" }} />);
+    expect(screen.getByText(/imposter bailed/i)).toBeTruthy();
+    expect(screen.getByText(/crew wins by forfeit/i)).toBeTruthy();
+  });
+
   it("host can Continue → emits room:playAgain", () => {
     render(<WinnerReveal room={room} />); // me = host
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));

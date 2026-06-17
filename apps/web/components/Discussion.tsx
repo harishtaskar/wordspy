@@ -59,15 +59,15 @@ export function Discussion({ room }: { room: RoomSummary }) {
           return (
             <div
               key={`${m.ts}-${i}`}
-              className="flex w-full items-start gap-2 border-b-2 border-ink px-3 py-2 last:border-b-0"
+              className="flex w-full items-center gap-2 border-b-2 border-ink px-3 py-2 last:border-b-0"
               style={{ background: mine ? "#FFF3C4" : avatarTint(m.playerId, colorIndex) }}
             >
               <Avatar id={m.playerId} name={m.username} size={28} colorIndex={colorIndex} />
-              <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-bold uppercase tracking-[1px] text-muted">
-                  {mine ? "You" : m.username}
+              <div className="min-w-0 flex-1 gap-0">
+                <span className="text-[12px] font-bold tracking-[1px] text-muted">
+                  {mine ? `${m.username} (You)` : m.username}
                 </span>
-                <p className="break-words text-[14px] font-bold leading-snug">{m.text}</p>
+                <p className="break-words text-[14px] font-medium leading-snug">{m.text}</p>
               </div>
             </div>
           );

@@ -54,7 +54,7 @@ describe("Discussion", () => {
     expect(screen.getByText("Best when shared.")).toBeTruthy();
     expect(screen.getByText("Comes in a box.")).toBeTruthy();
     expect(screen.getByText("Aanya")).toBeTruthy(); // other sender label
-    expect(screen.getByText("You")).toBeTruthy(); // p2 (me) label
+    expect(screen.getByText(/Rex \(You\)/)).toBeTruthy(); // p2 (me) label
   });
 
   it("emits chat:send on send and clears the input", () => {

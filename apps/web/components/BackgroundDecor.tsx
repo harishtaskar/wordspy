@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /* Uniform small game-themed line glyphs (stroke = currentColor, viewBox 32). */
-const SIZE = 22;
+const SIZE = 28;
 const sw = {
   fill: "none",
   stroke: "currentColor",
@@ -32,8 +32,8 @@ const ICONS: Array<() => ReactNode> = [
   () => <Svg><path d="M12 6c4 0 6 4 6 8s-1 7-4 7-3-3-6-3-3 4-3 0 1-12 7-12z" {...sw} /><circle cx="22" cy="13" r="2.5" {...sw} /><circle cx="24" cy="20" r="2" {...sw} /></Svg>, // fingerprint-ish
 ];
 
-const COLS = 7;
-const ROWS = 12;
+const COLS = 9;
+const ROWS = 16;
 
 /** Fixed, subtle, dense light-gray game-icon pattern (paper bg unchanged). */
 export function BackgroundDecor() {

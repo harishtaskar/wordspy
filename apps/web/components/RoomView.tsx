@@ -14,6 +14,7 @@ import { Discussion } from "./Discussion";
 import { Voting } from "./Voting";
 import { VoteResultReveal } from "./VoteResultReveal";
 import { FinalGuess } from "./FinalGuess";
+import { WinnerReveal } from "./WinnerReveal";
 
 /** Room shell: lobby (code/share + roster) or, once started, the role reveal. */
 export function RoomView({ room }: { room: RoomSummary }) {
@@ -56,6 +57,15 @@ export function RoomView({ room }: { room: RoomSummary }) {
       socket.off("room:kicked", onKicked);
     };
   }, [room.code, setRoom, setRole, addMessage, clearRoom, clearRole, clearChat, router]);
+
+  // After a rematch the room returns to lobby — drop last match's secrets/chat.
+  useEffect(() => {
+    if (liveRoom.phase === "lobby") {
+      clearRole();
+      clearChat();
+      setRevealDone(false);
+    }
+  }, [liveRoom.phase, clearRole, clearChat]);
 
   // --- Role reveal phase ---------------------------------------------------
   if (liveRoom.phase === "role-reveal") {
@@ -115,18 +125,11 @@ export function RoomView({ room }: { room: RoomSummary }) {
     );
   }
 
-  // --- Game over (full reveal + scores = Story 4.5) ------------------------
+  // --- Game over -----------------------------------------------------------
   if (liveRoom.phase === "game-over") {
-    const crewWon = liveRoom.winner === "crew";
     return (
-      <section
-        className={`border-[3px] border-ink p-6 text-center text-white shadow-[var(--shadow-hero)] ${crewWon ? "bg-crew" : "bg-imposter"}`}
-      >
-        <p className="text-[10px] font-bold uppercase tracking-[1.5px] opacity-80">Winner</p>
-        <p className="mt-1 text-[34px] uppercase leading-none tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-          {crewWon ? "Crew wins" : "Imposter wins"}
-        </p>
-        <p className="mt-2 text-[12px] opacity-90">Scores + Play Again in Stories 4.4–4.6.</p>
+      <section className="flex flex-col gap-4">
+        <WinnerReveal room={liveRoom} />
       </section>
     );
   }

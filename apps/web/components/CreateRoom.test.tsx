@@ -35,7 +35,7 @@ describe("CreateRoom", () => {
       revote: false,
       settings: DEFAULT_ROOM_SETTINGS,
       hostId: "s1",
-      players: [{ id: "s1", username: "Aanya", isHost: true, isReady: false, isEliminated: false }],
+      players: [{ id: "s1", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 0 }],
     };
     emit.mockImplementation((_event, _req, cb) => cb({ ok: true, data: room }));
 

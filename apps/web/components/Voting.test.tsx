@@ -22,9 +22,9 @@ const room: RoomSummary = {
   settings: DEFAULT_ROOM_SETTINGS,
   hostId: "host",
   players: [
-    { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false },
-    { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false },
-    { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false },
+    { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 0 },
+    { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0 },
+    { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false, score: 0 },
   ],
 };
 
@@ -56,7 +56,7 @@ describe("Voting", () => {
   it("excludes eliminated players as targets", () => {
     const r: RoomSummary = {
       ...room,
-      players: room.players.map((p) => (p.id === "p3" ? { ...p, isEliminated: true } : p)),
+      players: room.players.map((p) => (p.id === "p3" ? { ...p, isEliminated: true, score: 0 } : p)),
     };
     render(<Voting room={r} />);
     expect(screen.queryByRole("button", { name: /^mo/i })).toBeNull();
@@ -75,7 +75,7 @@ describe("Voting", () => {
     useConnectionStore.setState({ status: "connected", socketId: "p2", protocolVersion: 1 });
     const r: RoomSummary = {
       ...room,
-      players: room.players.map((p) => (p.id === "p2" ? { ...p, isEliminated: true } : p)),
+      players: room.players.map((p) => (p.id === "p2" ? { ...p, isEliminated: true, score: 0 } : p)),
     };
     render(<Voting room={r} />);
     expect(screen.getByText(/spectating/i)).toBeTruthy();

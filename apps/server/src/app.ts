@@ -17,6 +17,7 @@ import {
   setReady,
   kickPlayer,
   startGame,
+  playAgain,
   castVote,
   resolveRound,
   nextAfterResult,
@@ -213,6 +214,19 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       io.to(code).emit("room:state", summary);
     });
 
+    socket.on("room:playAgain", (req, ack) => {
+      const code = typeof req?.code === "string" ? req.code.trim().toUpperCase() : "";
+      const result = playAgain(code, socket.id);
+      if (!result.ok) {
+        if (typeof ack === "function") ack({ ok: false, error: result.error });
+        return;
+      }
+      const summary = toSummary(result.room);
+      if (typeof ack === "function") ack({ ok: true, data: summary });
+      io.to(code).emit("room:state", summary);
+      console.log(`[room] ${code} rematch → lobby`);
+    });
+
     socket.on("room:kick", (req, ack) => {
       const code = typeof req?.code === "string" ? req.code.trim().toUpperCase() : "";
       const targetId = typeof req?.targetId === "string" ? req.targetId : "";
@@ -247,6 +261,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
 
       room.secretWord = word;
       room.imposterId = imposterId;
+      room.imposterUsername = room.players.get(imposterId)?.username;
       for (const p of room.players.values()) {
         p.role = p.id === imposterId ? "imposter" : "crew";
       }

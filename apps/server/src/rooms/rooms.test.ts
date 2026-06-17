@@ -11,6 +11,7 @@ import {
   setEliminated,
   kickPlayer,
   startGame,
+  playAgain,
   castVote,
   resolveRound,
   nextAfterResult,
@@ -450,6 +451,73 @@ describe("submitFinalGuess", () => {
     const room = finalGuessRoom();
     room.phase = "voting";
     expect(submitFinalGuess(room, "imp", "pizza")).toMatchObject({ ok: false });
+  });
+});
+
+describe("playAgain (4.6)", () => {
+  function endedRoom() {
+    const room = createRoom({ id: "host", username: "Aanya" }, DEFAULT_ROOM_SETTINGS);
+    addPlayer(room.code, { id: "p2", username: "Rex" });
+    room.phase = "game-over";
+    room.winner = "crew";
+    room.round = 2;
+    room.secretWord = "Pizza";
+    room.imposterId = "p2";
+    room.usedWords.add("Pizza");
+    const p2 = room.players.get("p2")!;
+    p2.score = 100;
+    p2.eliminated = true;
+    p2.eliminatedRound = 1;
+    p2.role = "imposter";
+    return room;
+  }
+
+  it("resets to lobby keeping players + usedWords, scores cleared", () => {
+    const room = endedRoom();
+    const res = playAgain(room.code, "host");
+    expect(res.ok).toBe(true);
+    expect(room.phase).toBe("lobby");
+    expect(room.round).toBe(1);
+    expect(room.players.size).toBe(2); // roster kept
+    expect(room.winner).toBeUndefined();
+    expect(room.secretWord).toBeUndefined();
+    expect(room.imposterId).toBeUndefined();
+    const p2 = room.players.get("p2")!;
+    expect(p2.score).toBe(0);
+    expect(p2.eliminated).toBe(false);
+    expect(p2.role).toBeUndefined();
+    expect(room.usedWords.has("Pizza")).toBe(true); // no-repeat across session
+  });
+
+  it("rejects a non-host", () => {
+    const room = endedRoom();
+    expect(playAgain(room.code, "p2")).toMatchObject({ ok: false });
+  });
+
+  it("rejects when the match is not finished", () => {
+    const room = endedRoom();
+    room.phase = "lobby";
+    expect(playAgain(room.code, "host")).toMatchObject({ ok: false });
+  });
+});
+
+describe("toSummary reveal (4.5)", () => {
+  it("hides the word + imposter during play, reveals them at game-over", () => {
+    const room = createRoom({ id: "imp", username: "Imp" }, DEFAULT_ROOM_SETTINGS);
+    addPlayer(room.code, { id: "c1", username: "C1" });
+    room.imposterId = "imp";
+    room.imposterUsername = "Imp";
+    room.secretWord = "Pizza";
+
+    room.phase = "discussion";
+    const during = toSummary(room);
+    expect(during.revealedWord).toBeUndefined();
+    expect(during.revealedImposter).toBeUndefined();
+
+    setWinner(room, "crew"); // → game-over
+    const over = toSummary(room);
+    expect(over.revealedWord).toBe("Pizza");
+    expect(over.revealedImposter).toBe("Imp");
   });
 });
 

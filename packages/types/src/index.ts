@@ -130,6 +130,8 @@ export interface PlayerSummary {
   isReady: boolean;
   /** Voted out — spectating, cannot chat or vote. */
   isEliminated: boolean;
+  /** Match score (computed at game-over). */
+  score: number;
 }
 
 /** Wire-safe view of a room broadcast to its members. */
@@ -148,6 +150,10 @@ export interface RoomSummary {
   revote: boolean;
   /** Winning side, set only at `game-over`. */
   winner?: GameWinner;
+  /** The secret word — revealed ONLY at `game-over`. */
+  revealedWord?: string;
+  /** The Imposter's username — revealed ONLY at `game-over`. */
+  revealedImposter?: string;
   settings: RoomSettings;
   hostId: string;
   players: PlayerSummary[];
@@ -244,6 +250,8 @@ export interface ClientToServerEvents {
   "room:kick": (req: KickRequest, ack: (res: AckResponse<RoomSummary>) => void) => void;
   /** Host starts the match (lobby → starting). */
   "room:start": (req: StartRequest, ack: (res: AckResponse<RoomSummary>) => void) => void;
+  /** Host restarts with the same players (game-over → lobby). */
+  "room:playAgain": (req: { code: string }, ack: (res: AckResponse<RoomSummary>) => void) => void;
   /** Voluntarily leave a room (distinct from disconnect). */
   "room:leave": (req: { code: string }) => void;
   /** Send a discussion chat message (fire-and-forget; server validates). */

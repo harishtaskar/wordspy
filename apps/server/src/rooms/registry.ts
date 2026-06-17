@@ -10,6 +10,7 @@ import { MIN_PLAYERS } from "@wordspy/types";
 import { generateRoomCode } from "../lib/roomCode.js";
 import { normalizeGuess } from "../lib/normalizeGuess.js";
 import { resolveVotes } from "./resolveVotes.js";
+import { computeScores } from "./computeScores.js";
 
 /** Server-internal player — keyed by socket id. */
 export interface Player {
@@ -19,6 +20,10 @@ export interface Player {
   isReady: boolean;
   /** Voted out — spectating, cannot chat or vote. */
   eliminated: boolean;
+  /** Round in which this player was eliminated (for scoring). */
+  eliminatedRound?: number;
+  /** Match score, computed at game-over. */
+  score: number;
   /** Secret role, set at game start. NEVER included in any broadcast. */
   role?: "crew" | "imposter";
 }
@@ -44,12 +49,20 @@ export interface Room {
   secretWord?: string;
   /** Socket id of the Imposter for the current round. NEVER broadcast. */
   imposterId?: string;
+  /** Imposter username, captured at assignment so it survives a disconnect. */
+  imposterUsername?: string;
   /** Result of the last closed voting round (revealed at the `result` phase). */
   voteResult?: VoteResult;
   /** True while a re-vote round (after a tie) is open. */
   revote: boolean;
   /** Winning side, set at `game-over`. */
   winner?: GameWinner;
+  /** Round the imposter was caught (undefined = never), for scoring. */
+  imposterCaughtRound?: number;
+  /** Crew who voted the imposter in the catching round (correct-vote bonus). */
+  correctVoters: Set<string>;
+  /** Imposter's final guess was correct. */
+  stole: boolean;
   createdAt: number;
 }
 
@@ -77,10 +90,15 @@ export function createRoom(host: { id: string; username: string }, settings: Roo
     settings,
     hostId: host.id,
     players: new Map([
-      [host.id, { id: host.id, username: host.username, isHost: true, isReady: false, eliminated: false }],
+      [
+        host.id,
+        { id: host.id, username: host.username, isHost: true, isReady: false, eliminated: false, score: 0 },
+      ],
     ]),
     votes: new Map<string, string>(),
     revote: false,
+    correctVoters: new Set<string>(),
+    stole: false,
     usedWords: new Set<string>(),
     createdAt: Date.now(),
   };
@@ -111,6 +129,7 @@ export function addPlayer(code: string, player: { id: string; username: string }
     isHost: false,
     isReady: false,
     eliminated: false,
+    score: 0,
   });
   return { ok: true, room };
 }
@@ -234,10 +253,19 @@ export function resolveRound(room: Room): RoundOutcome {
   }
 
   const wasImposter = suspectId !== null && suspectId === room.imposterId;
-  // A caught Crew member is eliminated; the Imposter is not (match ends in Epic 4).
-  if (suspectId && !wasImposter) {
+  if (wasImposter && suspectId) {
+    // Record the catch + the crew who voted correctly (scoring facts).
+    room.imposterCaughtRound = room.round;
+    room.correctVoters = new Set(
+      [...room.votes.entries()].filter(([, t]) => t === suspectId).map(([v]) => v),
+    );
+  } else if (suspectId) {
+    // A caught Crew member is eliminated for the rest of the match.
     const p = room.players.get(suspectId);
-    if (p) p.eliminated = true;
+    if (p) {
+      p.eliminated = true;
+      p.eliminatedRound = room.round;
+    }
   }
 
   const result: VoteResult = {
@@ -265,10 +293,14 @@ export function nextAfterResult(room: Room): "round2" | "terminal" {
   return "terminal";
 }
 
-/** Record the winning side and end the match. Single source of truth for a winner. */
+/** Record the winning side, compute scores, and end the match. */
 export function setWinner(room: Room, winner: GameWinner): void {
   room.winner = winner;
   room.phase = "game-over";
+  const scores = computeScores(room); // PRD §10
+  for (const p of room.players.values()) {
+    p.score = scores[p.id] ?? 0;
+  }
 }
 
 export type FinalGuessResult = { ok: true; correct: boolean } | { ok: false; error: string };
@@ -281,6 +313,7 @@ export function submitFinalGuess(room: Room, guesserId: string, word: string): F
   if (room.phase !== "final-guess") return { ok: false, error: "Not the final guess." };
   if (guesserId !== room.imposterId) return { ok: false, error: "Only the imposter guesses." };
   const correct = normalizeGuess(word) === normalizeGuess(room.secretWord ?? "");
+  room.stole = correct;
   setWinner(room, correct ? "imposter" : "crew");
   return { ok: true, correct };
 }
@@ -296,6 +329,45 @@ export function resolveTerminal(room: Room): void {
   } else {
     setWinner(room, "imposter"); // imposter survived both rounds
   }
+}
+
+/** Reset per-match state back to lobby, keeping the roster + session word history. */
+export function resetForRematch(room: Room): void {
+  if (room.timer) clearTimeout(room.timer);
+  room.timer = undefined;
+  room.phase = "lobby";
+  room.round = 1;
+  room.phaseEndsAt = undefined;
+  room.votes.clear();
+  room.voteResult = undefined;
+  room.revote = false;
+  room.winner = undefined;
+  room.secretWord = undefined;
+  room.imposterId = undefined;
+  room.imposterUsername = undefined;
+  room.imposterCaughtRound = undefined;
+  room.correctVoters = new Set<string>();
+  room.stole = false;
+  for (const p of room.players.values()) {
+    p.eliminated = false;
+    p.eliminatedRound = undefined;
+    p.role = undefined;
+    p.isReady = false;
+    p.score = 0;
+  }
+  // KEEP: players, usedWords (no-repeat across the session), settings, hostId.
+}
+
+export type PlayAgainResult = { ok: true; room: Room } | { ok: false; error: string };
+
+/** Host restarts the match (game-over → lobby), same players. */
+export function playAgain(code: string, hostId: string): PlayAgainResult {
+  const room = rooms.get(code);
+  if (!room) return { ok: false, error: "Room not found." };
+  if (room.hostId !== hostId) return { ok: false, error: "Only the host can restart." };
+  if (room.phase !== "game-over") return { ok: false, error: "Match not finished." };
+  resetForRematch(room);
+  return { ok: true, room };
 }
 
 /** Begin Round 2 of the SAME match: new discussion, votes reset, word/roles kept. */
@@ -334,7 +406,9 @@ export function toSummary(room: Room): RoomSummary {
     isHost: p.isHost,
     isReady: p.isReady,
     isEliminated: p.eliminated,
+    score: p.score,
   }));
+  const isOver = room.phase === "game-over";
   return {
     code: room.code,
     phase: room.phase,
@@ -344,6 +418,11 @@ export function toSummary(room: Room): RoomSummary {
     voteResult: room.voteResult,
     revote: room.revote,
     winner: room.winner,
+    // Secret word + imposter identity are revealed ONLY at game-over.
+    revealedWord: isOver ? room.secretWord : undefined,
+    revealedImposter: isOver
+      ? (room.players.get(room.imposterId ?? "")?.username ?? room.imposterUsername)
+      : undefined,
     settings: room.settings,
     hostId: room.hostId,
     players,

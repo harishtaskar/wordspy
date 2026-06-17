@@ -26,6 +26,24 @@ No database (state is in-memory).
 
 (Render alternative: New → Blueprint, it reads `render.yaml`.)
 
+### Server on Fly.io (warm, no cold-start)
+
+Uses `Dockerfile` + `fly.toml` (already in the repo; the image bundles only the
+server + shared types).
+
+```bash
+# install flyctl: https://fly.io/docs/flyctl/install/
+fly auth login
+fly launch --no-deploy        # accept the fly.toml; pick a unique app name + region
+fly secrets set WEB_ORIGIN=https://your-app.vercel.app
+fly deploy
+fly status                    # shows the https URL, e.g. https://wordspy-server.fly.dev
+```
+
+`fly.toml` keeps one machine always running (`auto_stop_machines = "off"`,
+`min_machines_running = 1`) so there's no cold start; `force_https` gives `wss`
+for Socket.IO. Health check hits `/health`.
+
 ## 2. Deploy the web (Vercel)
 
 1. [Vercel](https://vercel.com) → **Add New → Project** → import this repo.

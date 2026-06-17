@@ -1,0 +1,29 @@
+# Fly.io — wordspy Socket.IO server. Change `app` to your chosen name.
+app = "wordspy-server"
+primary_region = "iad" # pick a region near you: fly platform regions
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  # WEB_ORIGIN is set as a secret, not here:
+  #   fly secrets set WEB_ORIGIN=https://your-app.vercel.app
+
+[http_service]
+  internal_port = 8080
+  force_https = true            # https → wss for Socket.IO
+  auto_start_machines = true
+  auto_stop_machines = "off"    # stay warm — no cold start on first join
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "get"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+**/dist
+**/.next
+apps/web
+.git
+.claude
+_bmad
+_bmad-output
+docs
+design-artifacts
+**/*.test.ts
+**/*.test.tsx
+*.md
+.env
+**/.env
+**/.env.local

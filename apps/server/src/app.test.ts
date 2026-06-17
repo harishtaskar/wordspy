@@ -656,3 +656,44 @@ describe("chat masks the secret word (#7)", () => {
     expect(msg.text).toContain("*****");
   });
 });
+
+describe("public room browsing", () => {
+  let c2: Socket<ServerToClientEvents, ClientToServerEvents> | undefined;
+  afterEach(() => { c2?.close(); c2 = undefined; });
+
+  it("browseJoin returns the list and a new public room pushes a live update", async () => {
+    const port = await listen();
+    client = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => client!.on("connect", () => r()));
+
+    const initial = await new Promise<AckResponse<unknown>>((r) => client!.emit("room:browseJoin", r));
+    expect(initial.ok).toBe(true);
+
+    const update = new Promise<Array<{ code: string; hostName: string }>>((resolve) =>
+      client!.on("public:rooms", (rooms) => rooms.length > 0 && resolve(rooms)),
+    );
+
+    c2 = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => c2!.on("connect", () => r()));
+    await new Promise<AckResponse<RoomSummary>>((r) =>
+      c2!.emit("room:create", { username: "Aanya", settings: { ...DEFAULT_ROOM_SETTINGS, isPrivate: false } }, r),
+    );
+
+    const rooms = await update;
+    expect(rooms[0]?.hostName).toBe("Aanya");
+  });
+
+  it("does not list a private room", async () => {
+    const port = await listen();
+    client = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => client!.on("connect", () => r()));
+    await new Promise<AckResponse<RoomSummary>>((r) =>
+      client!.emit("room:create", { username: "Aanya", settings: { ...DEFAULT_ROOM_SETTINGS, isPrivate: true } }, r),
+    );
+    c2 = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => c2!.on("connect", () => r()));
+    const list = await new Promise<AckResponse<unknown[]>>((r) => c2!.emit("room:browseJoin", r));
+    expect(list.ok).toBe(true);
+    if (list.ok) expect(list.data).toHaveLength(0);
+  });
+});

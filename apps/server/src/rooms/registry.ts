@@ -6,6 +6,7 @@ import type {
   VoteResult,
   GameWinner,
   WinReason,
+  PublicRoomInfo,
 } from "@wordspy/types";
 import { MIN_PLAYERS } from "@wordspy/types";
 import { generateRoomCode } from "../lib/roomCode.js";
@@ -222,6 +223,27 @@ export function setReady(code: string, id: string, ready: boolean): Room | undef
   if (!room || !player) return undefined;
   player.isReady = ready;
   return room;
+}
+
+const PUBLIC_LIST_CAP = 50;
+
+/** Joinable public rooms: not private, still in the lobby, not full. Newest first. */
+export function listPublicRooms(): PublicRoomInfo[] {
+  const out: PublicRoomInfo[] = [];
+  for (const room of rooms.values()) {
+    if (room.settings.isPrivate) continue;
+    if (room.phase !== "lobby") continue;
+    if (room.players.size >= room.settings.maxPlayers) continue;
+    out.push({
+      code: room.code,
+      hostName: room.players.get(room.hostId)?.username ?? "—",
+      players: room.players.size,
+      maxPlayers: room.settings.maxPlayers,
+      category: room.settings.category,
+    });
+  }
+  out.sort((a, b) => (rooms.get(b.code)?.createdAt ?? 0) - (rooms.get(a.code)?.createdAt ?? 0));
+  return out.slice(0, PUBLIC_LIST_CAP);
 }
 
 /** Active (non-eliminated) players — the eligible voters/targets. */

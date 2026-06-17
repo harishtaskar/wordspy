@@ -20,6 +20,7 @@ import {
   playAgain,
   updateRoomSettings,
   castVote,
+  listPublicRooms,
   resolveRound,
   nextAfterResult,
   startRound2,
@@ -49,6 +50,13 @@ const RESULT_REVEAL_MS = 5000;
 const FINAL_GUESS_MS = 20000;
 /** Hard voting deadline — guarantees a round resolves even if someone never votes. */
 const VOTE_MS = 30000;
+/** Socket.IO room that public-room browsers subscribe to for live updates. */
+const BROWSE = "browse";
+
+/** Push the current public-room directory to everyone on the browse channel. */
+function broadcastPublicRooms(io: GameIOServer): void {
+  io.to(BROWSE).emit("public:rooms", listPublicRooms());
+}
 
 /**
  * Server-authoritative phase clock. Sets `phaseEndsAt` for the current phase and
@@ -225,6 +233,15 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       }
     });
 
+    socket.on("room:browseJoin", (ack) => {
+      socket.join(BROWSE);
+      if (typeof ack === "function") ack({ ok: true, data: listPublicRooms() });
+    });
+
+    socket.on("room:browseLeave", () => {
+      socket.leave(BROWSE);
+    });
+
     socket.on("room:create", (req, ack) => {
       const result = validateCreateRoom(req);
       if (!result.ok) {
@@ -242,6 +259,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
         if (typeof ack === "function") ack({ ok: true, data: summary });
         // Broadcast to the room (just the host for now; matters as players join).
         io.to(room.code).emit("room:state", summary);
+        broadcastPublicRooms(io);
         console.log(`[room] created ${room.code} by ${socket.id}`);
       } catch (err) {
         console.error("[room] create failed:", err);
@@ -270,6 +288,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       if (typeof ack === "function") ack({ ok: true, data: summary });
       // Existing members see the new player live.
       io.to(valid.code).emit("room:state", summary);
+      broadcastPublicRooms(io);
       console.log(`[room] ${socket.id} joined ${valid.code}`);
     });
 
@@ -301,6 +320,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       const summary = toSummary(result.room);
       if (typeof ack === "function") ack({ ok: true, data: summary });
       io.to(code).emit("room:state", summary);
+      broadcastPublicRooms(io);
       console.log(`[room] ${code} rematch → lobby`);
     });
 
@@ -319,6 +339,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       const summary = toSummary(result.room);
       if (typeof ack === "function") ack({ ok: true, data: summary });
       io.to(code).emit("room:state", summary);
+      broadcastPublicRooms(io); // privacy/category/max may have changed
     });
 
     socket.on("room:kick", (req, ack) => {
@@ -335,6 +356,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       // Tell the kicked player and remove them from the room channel.
       io.to(targetId).emit("room:kicked", { code });
       io.sockets.sockets.get(targetId)?.leave(code);
+      broadcastPublicRooms(io);
       console.log(`[room] ${targetId} kicked from ${code}`);
     });
 
@@ -383,6 +405,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
 
       // Broadcast the phase change (secret-free) to the whole room.
       io.to(code).emit("room:state", summary);
+      broadcastPublicRooms(io); // left the lobby → drop from the public list
       console.log(`[room] ${code} started; imposter assigned, roles distributed`);
     });
 
@@ -397,6 +420,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       } else {
         console.log(`[room] ${code} emptied and removed`);
       }
+      broadcastPublicRooms(io);
     };
 
     socket.on("room:leave", (req) => {

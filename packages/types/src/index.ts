@@ -171,6 +171,15 @@ export interface CreateRoomRequest {
   settings: RoomSettings;
 }
 
+/** Lightweight public-room listing for the browse screen. */
+export interface PublicRoomInfo {
+  code: string;
+  hostName: string;
+  players: number;
+  maxPlayers: number;
+  category: Category;
+}
+
 export interface JoinRoomRequest {
   code: string;
   username: string;
@@ -278,6 +287,10 @@ export interface ClientToServerEvents {
     req: { code: string; word: string },
     ack: (res: AckResponse<RoomSummary>) => void,
   ) => void;
+  /** Start watching the public-room directory; ack returns the current list. */
+  "room:browseJoin": (ack: (res: AckResponse<PublicRoomInfo[]>) => void) => void;
+  /** Stop watching the public-room directory. */
+  "room:browseLeave": () => void;
 }
 
 /** Events the server emits to the client. */
@@ -292,6 +305,8 @@ export interface ServerToClientEvents {
   "game:role": (payload: RolePayload) => void;
   /** A discussion chat message broadcast to the room. */
   "chat:message": (msg: ChatMessage) => void;
+  /** Live public-room directory update (to browsers only). */
+  "public:rooms": (rooms: PublicRoomInfo[]) => void;
 }
 
 /** Per-socket data the server attaches to each connection. */

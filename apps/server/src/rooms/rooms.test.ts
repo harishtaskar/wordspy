@@ -15,6 +15,7 @@ import {
   resetForRematch,
   updateRoomSettings,
   castVote,
+  listPublicRooms,
   resolveRound,
   nextAfterResult,
   startRound2,
@@ -215,6 +216,29 @@ describe("kickPlayer", () => {
     room.phase = "discussion";
     expect(kickPlayer(room.code, "host", "p2")).toMatchObject({ ok: false });
     expect(room.players.has("p2")).toBe(true);
+  });
+});
+
+describe("listPublicRooms", () => {
+  it("lists only public, lobby-phase, not-full rooms with the right info", () => {
+    const pub = createRoom({ id: "h1", username: "Aanya" }, { ...DEFAULT_ROOM_SETTINGS, isPrivate: false });
+    const priv = createRoom({ id: "h2", username: "Rex" }, { ...DEFAULT_ROOM_SETTINGS, isPrivate: true });
+    const started = createRoom({ id: "h3", username: "Mo" }, { ...DEFAULT_ROOM_SETTINGS, isPrivate: false });
+    started.phase = "discussion";
+    const full = createRoom({ id: "h4", username: "Sam" }, { ...DEFAULT_ROOM_SETTINGS, isPrivate: false, maxPlayers: 4 });
+    addPlayer(full.code, { id: "f1", username: "F1" });
+    addPlayer(full.code, { id: "f2", username: "F2" });
+    addPlayer(full.code, { id: "f3", username: "F3" }); // host + 3 = 4 = full
+
+    const list = listPublicRooms();
+    const codes = list.map((r) => r.code);
+    expect(codes).toContain(pub.code);
+    expect(codes).not.toContain(priv.code); // private
+    expect(codes).not.toContain(started.code); // not lobby
+    expect(codes).not.toContain(full.code); // full
+
+    const info = list.find((r) => r.code === pub.code)!;
+    expect(info).toMatchObject({ hostName: "Aanya", players: 1, category: DEFAULT_ROOM_SETTINGS.category });
   });
 });
 

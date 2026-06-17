@@ -32,7 +32,7 @@ export function Landing() {
 
   const result = validateUsername(draft);
 
-  const go = (path: "/create" | "/join") => {
+  const go = (path: "/create" | "/join" | "/browse") => {
     if (!result.ok) {
       setTouched(true);
       return;
@@ -87,6 +87,9 @@ export function Landing() {
         </Button>
         <Button variant="ghost" className="w-full" disabled={!result.ok} onClick={() => go("/join")}>
           Join Room
+        </Button>
+        <Button variant="ghost" className="w-full" disabled={!result.ok} onClick={() => go("/browse")}>
+          Browse Public Games
         </Button>
         <div className="flex justify-center gap-4">
           <button

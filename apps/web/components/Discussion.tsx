@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CHAT_MAX_LENGTH, type RoomSummary } from "@wordspy/types";
 import { Timer } from "./Timer";
+import { Avatar, avatarColor } from "./Avatar";
 import { getSocket } from "@/lib/socket";
 import { useChatStore } from "@/store/chat";
 import { useConnectionStore } from "@/store/connection";
@@ -13,6 +14,13 @@ export function Discussion({ room }: { room: RoomSummary }) {
   const myId = useConnectionStore((s) => s.socketId);
   const [draft, setDraft] = useState("");
   const eliminated = room.players.find((p) => p.id === myId)?.isEliminated ?? false;
+
+  // Auto-scroll the chat panel to the newest message.
+  const feedRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = feedRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length]);
 
   const send = () => {
     const text = draft.trim();
@@ -37,20 +45,34 @@ export function Discussion({ room }: { room: RoomSummary }) {
         <span className="text-[10px] font-bold uppercase tracking-[1.5px] text-muted">discussion</span>
       </div>
 
-      <ul className="flex max-h-[260px] flex-col gap-2 overflow-y-auto" aria-label="Discussion chat">
+      <div
+        ref={feedRef}
+        aria-label="Discussion chat"
+        className="flex h-[260px] flex-col gap-2 overflow-y-auto border-[3px] border-ink bg-bg p-2"
+      >
         {messages.length === 0 && (
-          <li className="text-center text-[12px] text-muted">Drop a clue…</li>
+          <p className="m-auto text-[12px] text-muted">Drop a clue…</p>
         )}
-        {messages.map((m, i) => (
-          <li key={`${m.ts}-${i}`} className="border-[3px] border-ink bg-surface px-3 py-2">
-            <span className="text-[10px] font-bold uppercase tracking-[1px] text-muted">
-              {m.username}
-              {m.playerId === myId ? " (you)" : ""}
-            </span>
-            <p className="text-[13px] font-bold">{m.text}</p>
-          </li>
-        ))}
-      </ul>
+        {messages.map((m, i) => {
+          const mine = m.playerId === myId;
+          return (
+            <div key={`${m.ts}-${i}`} className={`flex items-start gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+              <Avatar id={m.playerId} name={m.username} size={26} />
+              <div className={`max-w-[78%] ${mine ? "items-end text-right" : ""} flex flex-col`}>
+                <span className="px-1 text-[10px] font-bold uppercase tracking-[1px] text-muted">
+                  {mine ? "You" : m.username}
+                </span>
+                <span
+                  className="border-2 border-ink px-3 py-[6px] text-[13px] font-bold"
+                  style={{ background: mine ? "#FFF3C4" : `${avatarColor(m.playerId)}1A` }}
+                >
+                  {m.text}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {eliminated ? (
         <p

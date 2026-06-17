@@ -139,13 +139,32 @@ export function RoomView({ room }: { room: RoomSummary }) {
     typeof window !== "undefined" ? `${window.location.origin}/join?room=${room.code}` : "";
 
   const copy = async () => {
+    let ok = false;
     try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        ok = true;
+      }
     } catch {
-      setCopied(false);
+      ok = false;
     }
+    if (!ok) {
+      // Fallback for non-secure contexts (LAN IP, older browsers).
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = shareUrl;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        ok = false;
+      }
+    }
+    setCopied(ok);
+    if (ok) setTimeout(() => setCopied(false), 1500);
   };
 
   return (

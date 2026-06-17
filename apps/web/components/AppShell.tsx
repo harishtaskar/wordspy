@@ -13,8 +13,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   useSocket();
 
   return (
-    <main className="min-h-dvh w-full bg-bg p-4">
-      <div className="mx-auto flex w-full max-w-[420px] flex-col gap-4">
+    <main className="flex min-h-dvh w-full items-center justify-center bg-bg p-4">
+      <div className="flex w-full max-w-[420px] flex-col gap-4">
         <header className="flex items-center justify-between">
           <h1
             className="text-[24px] uppercase leading-none tracking-tight"

@@ -38,6 +38,7 @@ import { phasePlan } from "./rooms/phasePlan.js";
 import { pickWord } from "./words/pickWord.js";
 import { CHAT_MAX_LENGTH } from "@wordspy/types";
 import type { CrewRolePayload, ImposterRolePayload, ChatMessage } from "@wordspy/types";
+import { maskSecretWord } from "./lib/maskSecretWord.js";
 
 /** Minimum interval between chat messages from one socket (ms). */
 const CHAT_MIN_INTERVAL_MS = 750;
@@ -393,8 +394,8 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       if (player.eliminated) return; // eliminated players spectate, no chat
       if (room.phase !== "discussion") return; // chat is a discussion-phase activity
 
-      const text = (typeof req?.text === "string" ? req.text : "").trim().slice(0, CHAT_MAX_LENGTH);
-      if (!text) return; // drop empty
+      const raw = (typeof req?.text === "string" ? req.text : "").trim().slice(0, CHAT_MAX_LENGTH);
+      if (!raw) return; // drop empty
 
       const now = Date.now();
       if (socket.data.lastChatAt && now - socket.data.lastChatAt < CHAT_MIN_INTERVAL_MS) {
@@ -402,6 +403,9 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       }
       socket.data.lastChatAt = now;
 
+      // CRITICAL: never let the secret word appear in chat — mask it server-side
+      // (the server is the only party that always knows it).
+      const text = maskSecretWord(raw, room.secretWord);
       const msg: ChatMessage = { playerId: socket.id, username: player.username, text, ts: now };
       io.to(code).emit("chat:message", msg);
     });

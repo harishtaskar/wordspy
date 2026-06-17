@@ -1,16 +1,33 @@
 "use client";
 
+import { useEffect } from "react";
+import confetti from "canvas-confetti";
 import type { RoomSummary } from "@wordspy/types";
 import { Button } from "./Button";
+import { Avatar } from "./Avatar";
 import { getSocket } from "@/lib/socket";
 import { useConnectionStore } from "@/store/connection";
 
-/** End screen: winner, revealed word, imposter identity, scoreboard, host rematch. */
+const MEDALS = ["🥇", "🥈", "🥉"];
+
+/** End screen: confetti, winner, revealed word + imposter, podium + scoreboard, host rematch. */
 export function WinnerReveal({ room }: { room: RoomSummary }) {
   const myId = useConnectionStore((s) => s.socketId);
   const isHost = room.hostId === myId;
   const crewWon = room.winner === "crew";
   const ranked = [...room.players].sort((a, b) => b.score - a.score);
+  const podium = ranked.slice(0, 3);
+
+  // Celebratory confetti, coloured by the winning side.
+  useEffect(() => {
+    const colors = crewWon ? ["#1763E8", "#FFD23F", "#0FA968"] : ["#FF5436", "#FFD23F", "#B967FF"];
+    const burst = (particleRatio: number, opts: confetti.Options) =>
+      confetti({ origin: { y: 0.6 }, colors, particleCount: Math.floor(200 * particleRatio), ...opts });
+    burst(0.25, { spread: 26, startVelocity: 55 });
+    burst(0.35, { spread: 60 });
+    burst(0.2, { spread: 100, decay: 0.91, scalar: 0.8 });
+    burst(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+  }, [crewWon]);
 
   const playAgain = () => {
     getSocket().emit("room:playAgain", { code: room.code }, () => {});
@@ -42,20 +59,41 @@ export function WinnerReveal({ room }: { room: RoomSummary }) {
         </div>
       </div>
 
+      {/* Podium — top 3 by score */}
       <div className="border-[3px] border-ink bg-surface p-[14px] shadow-[var(--shadow-card)]">
-        <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-muted">Scores</p>
-        <ul className="mt-2 flex flex-col gap-1">
-          {ranked.map((p) => (
-            <li key={p.id} className="flex justify-between text-[14px] font-bold">
-              <span>
+        <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-muted">Podium</p>
+        <ul className="mt-2 flex flex-col gap-2">
+          {podium.map((p, i) => (
+            <li key={p.id} className="flex items-center gap-2 border-2 border-ink bg-bg px-2 py-[6px]">
+              <span className="text-[18px]">{MEDALS[i]}</span>
+              <Avatar id={p.id} name={p.username} size={26} />
+              <span className="text-[14px] font-bold">
                 {p.username}
+                {p.id === myId ? " (you)" : ""}
                 {p.username === room.revealedImposter ? " 🕵" : ""}
               </span>
-              <span style={{ fontFamily: "var(--font-display)" }}>+{p.score}</span>
+              <span className="ml-auto text-[16px]" style={{ fontFamily: "var(--font-display)" }}>
+                +{p.score}
+              </span>
             </li>
           ))}
         </ul>
       </div>
+
+      {ranked.length > 3 && (
+        <div className="border-[3px] border-ink bg-surface p-[14px] shadow-[var(--shadow-card)]">
+          <ul className="flex flex-col gap-1">
+            {ranked.slice(3).map((p, i) => (
+              <li key={p.id} className="flex items-center gap-2 text-[13px] font-bold">
+                <span className="w-4 text-muted">{i + 4}</span>
+                <Avatar id={p.id} name={p.username} size={22} />
+                <span>{p.username}</span>
+                <span className="ml-auto" style={{ fontFamily: "var(--font-display)" }}>+{p.score}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {isHost ? (
         <Button variant="primary" className="w-full" onClick={playAgain}>

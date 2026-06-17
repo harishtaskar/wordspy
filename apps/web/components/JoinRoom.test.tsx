@@ -70,9 +70,27 @@ describe("JoinRoom", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Room full."));
   });
 
-  it("redirects to Landing without a valid username", () => {
+  it("lets a fresh visitor set a name inline (share-link flow) without losing the code", () => {
     usePlayerSession.setState({ sessionId: "s1", username: "" });
+    search = new URLSearchParams("room=ABCDE");
     render(<JoinRoom />);
-    expect(replace).toHaveBeenCalledWith("/");
+    // No redirect — the name field is shown and the code is kept.
+    expect(replace).not.toHaveBeenCalled();
+    const nameInput = screen.getByLabelText(/your name/i) as HTMLInputElement;
+    expect((screen.getByLabelText(/room code/i) as HTMLInputElement).value).toBe("ABCDE");
+    const btn = screen.getByRole("button", { name: /join ▸/i }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true); // no name yet
+    fireEvent.change(nameInput, { target: { value: "Mo" } });
+    expect(btn.disabled).toBe(false);
+  });
+
+  it("emits the inline-entered name on join", () => {
+    usePlayerSession.setState({ sessionId: "s1", username: "" });
+    search = new URLSearchParams("room=ABCDE");
+    emit.mockImplementation((_e, _req, cb) => cb({ ok: true, data: room }));
+    render(<JoinRoom />);
+    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "Mo" } });
+    fireEvent.click(screen.getByRole("button", { name: /join ▸/i }));
+    expect(emit).toHaveBeenCalledWith("room:join", { code: "ABCDE", username: "Mo" }, expect.any(Function));
   });
 });

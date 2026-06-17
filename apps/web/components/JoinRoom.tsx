@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  type AckResponse,
-  type RoomSummary,
-} from "@wordspy/types";
+import { type AckResponse, type RoomSummary } from "@wordspy/types";
 import { Button } from "./Button";
 import { RoomView } from "./RoomView";
 import { getSocket } from "@/lib/socket";
@@ -18,37 +15,52 @@ const CODE_LENGTH = 5;
 export function JoinRoom() {
   const router = useRouter();
   const params = useSearchParams();
-  const username = usePlayerSession((s) => s.username);
+  const sessionName = usePlayerSession((s) => s.username);
+  const setUsername = usePlayerSession((s) => s.setUsername);
+  const ensureSession = usePlayerSession((s) => s.ensureSession);
   const room = useRoomStore((s) => s.room);
   const setRoom = useRoomStore((s) => s.setRoom);
 
+  // If we arrived via a share link with no name yet (sessionStorage is per-tab),
+  // collect the name here instead of bouncing to Landing and losing the code.
+  const [name, setName] = useState(sessionName);
   const [code, setCode] = useState("");
   const [pending, setPending] = useState(false);
+  const [touched, setTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Prefill from a share link (?room=CODE).
+  useEffect(() => {
+    ensureSession();
+  }, [ensureSession]);
+
+  // Prefill the code from the share link (?room=CODE).
   useEffect(() => {
     const fromLink = params.get("room");
     if (fromLink) setCode(fromLink.toUpperCase().slice(0, CODE_LENGTH));
   }, [params]);
 
-  // Guard: a valid username is required (Story 1.2).
-  useEffect(() => {
-    if (!validateUsername(username).ok) router.replace("/");
-  }, [username, router]);
-
   if (room) return <RoomView room={room} />;
 
-  const canSubmit = code.length === CODE_LENGTH && !pending;
+  const nameResult = validateUsername(name);
+  const canSubmit = code.length === CODE_LENGTH && nameResult.ok && !pending;
 
   const submit = () => {
+    if (!nameResult.ok) {
+      setTouched(true);
+      return;
+    }
     setError(null);
     setPending(true);
-    getSocket().emit("room:join", { code, username }, (res: AckResponse<RoomSummary>) => {
-      setPending(false);
-      if (res.ok) setRoom(res.data);
-      else setError(res.error);
-    });
+    setUsername(nameResult.value);
+    getSocket().emit(
+      "room:join",
+      { code, username: nameResult.value },
+      (res: AckResponse<RoomSummary>) => {
+        setPending(false);
+        if (res.ok) setRoom(res.data);
+        else setError(res.error);
+      },
+    );
   };
 
   return (
@@ -59,6 +71,25 @@ export function JoinRoom() {
       >
         Join Room
       </h2>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="join-name" className="text-[10px] font-bold uppercase tracking-[1.5px] text-muted">
+          Your name
+        </label>
+        <input
+          id="join-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => setTouched(true)}
+          placeholder="e.g. Aanya"
+          maxLength={24}
+          autoComplete="off"
+          className="min-h-[44px] border-[3px] border-ink bg-surface px-3 font-bold text-ink focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink"
+        />
+        <p className="min-h-[16px] text-[12px] font-bold text-imposter">
+          {touched && !nameResult.ok ? nameResult.error : ""}
+        </p>
+      </div>
 
       <div className="flex flex-col gap-1">
         <label htmlFor="code" className="text-[10px] font-bold uppercase tracking-[1.5px] text-muted">

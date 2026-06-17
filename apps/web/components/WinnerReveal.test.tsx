@@ -6,6 +6,7 @@ import { useConnectionStore } from "@/store/connection";
 
 const emit = vi.fn();
 vi.mock("@/lib/socket", () => ({ getSocket: () => ({ emit }) }));
+vi.mock("canvas-confetti", () => ({ default: vi.fn() }));
 
 beforeEach(() => {
   emit.mockReset();

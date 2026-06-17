@@ -4,17 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MIN_PLAYERS, type RoomSummary } from "@wordspy/types";
 import { Button } from "./Button";
+import { Avatar } from "./Avatar";
 import { getSocket } from "@/lib/socket";
 import { useConnectionStore } from "@/store/connection";
 import { useRoomStore } from "@/store/room";
-
-const AVATAR_COLORS = ["#1763E8", "#FF5436", "#0FA968", "#B967FF", "#FFD23F", "#FF6EC7"];
-
-function avatarColor(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length] as string;
-}
 
 /** Lobby roster: players, host badge, ready, live count, ready toggle. */
 export function Lobby({ room }: { room: RoomSummary }) {
@@ -92,11 +85,7 @@ export function Lobby({ room }: { room: RoomSummary }) {
             key={p.id}
             className="flex items-center gap-2 border-[3px] border-ink bg-surface px-3 py-2 font-bold"
           >
-            <span
-              aria-hidden
-              className="h-[26px] w-[26px] border-2 border-ink"
-              style={{ background: avatarColor(p.id) }}
-            />
+            <Avatar id={p.id} name={p.username} size={26} />
             <span className="text-[14px]">
               {p.username}
               {p.id === myId ? " (you)" : ""}

@@ -626,3 +626,32 @@ describe("review fixes — voting deadlock + multi-room (2026-06-17)", () => {
     expect(dup.ok).toBe(false);
   });
 });
+
+describe("chat masks the secret word (#7)", () => {
+  let c2: Socket<ServerToClientEvents, ClientToServerEvents> | undefined;
+  afterEach(() => { c2?.close(); c2 = undefined; });
+
+  it("replaces the secret word with asterisks before broadcasting", async () => {
+    const port = await listen();
+    client = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => client!.on("connect", () => r()));
+    const created = await new Promise<AckResponse<RoomSummary>>((r) =>
+      client!.emit("room:create", { username: "Aanya", settings: DEFAULT_ROOM_SETTINGS }, r),
+    );
+    if (!created.ok) throw new Error("create");
+    const code = created.data.code;
+    c2 = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => c2!.on("connect", () => r()));
+    await new Promise<AckResponse<RoomSummary>>((r) => c2!.emit("room:join", { code, username: "Rex" }, r));
+
+    const room = getRoom(code)!;
+    room.phase = "discussion";
+    room.secretWord = "Pizza";
+
+    const got = new Promise<ChatMessage>((resolve) => c2!.on("chat:message", resolve));
+    client!.emit("chat:send", { code, text: "i bet it's pizza honestly" });
+    const msg = await got;
+    expect(msg.text).not.toContain("pizza");
+    expect(msg.text).toContain("*****");
+  });
+});

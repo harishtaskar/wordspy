@@ -1,20 +1,19 @@
-# Socket.IO server image (for Fly.io / any container host).
-# Build context = repo root. Only the server + shared types are included.
+# Socket.IO server image (Northflank / Fly.io / any container host).
+# IMPORTANT: build context MUST be the repo root (where this Dockerfile lives).
+# .dockerignore keeps the image lean (web app, node_modules, tests, etc. excluded).
 FROM node:22-slim
 
 WORKDIR /app
 
-# Manifests + shared config + the two workspaces the server needs.
-COPY package.json package-lock.json tsconfig.base.json ./
-COPY packages ./packages
-COPY apps/server ./apps/server
+# Copy the whole (filtered) repo, then install + build the server.
+COPY . .
 
-# Install (dev deps included so tsc can build) — the types `prepare` script
-# builds @wordspy/types here; build:server then compiles types + server.
+# Dev deps included so tsc can build; the types `prepare` script builds
+# @wordspy/types, and build:server compiles types + server.
 RUN npm install --include=dev
 RUN npm run build:server
 
-# Fly maps the public port to this internal port.
+# Server reads PORT from env. Northflank: expose this same port (8080).
 ENV PORT=8080
 EXPOSE 8080
 

@@ -1,6 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo_Black, Inter } from "next/font/google";
+import { Archivo_Black, Bungee, Inter } from "next/font/google";
 import "./globals.css";
+
+// Logo face — chunky, game-y display font for the wordmark only.
+const bungee = Bungee({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-logo",
+  display: "swap",
+  fallback: ["Arial Black", "system-ui", "sans-serif"],
+});
 
 // Display face — DESIGN.md typography. Self-hosted via next/font (no FOUT, offline-safe).
 const archivoBlack = Archivo_Black({
@@ -31,7 +40,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${archivoBlack.variable} ${inter.variable}`}>
+    <html lang="en" className={`${archivoBlack.variable} ${bungee.variable} ${inter.variable}`}>
       <body>{children}</body>
     </html>
   );

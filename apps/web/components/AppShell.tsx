@@ -17,12 +17,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     <main className="relative flex min-h-dvh w-full items-center justify-center bg-bg p-4">
       <BackgroundDecor />
       <div className="relative z-10 flex w-full max-w-[420px] flex-col gap-4">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-col items-center gap-2">
           <h1
-            className="text-[24px] uppercase leading-none tracking-tight"
-            style={{ fontFamily: "var(--font-display)" }}
+            className="text-[44px] lowercase leading-none"
+            style={{ fontFamily: "var(--font-logo)", textShadow: "3px 3px 0 #111" }}
           >
-            wordspy
+            <span className="text-crew">word</span>
+            <span className="text-imposter">spy</span>
           </h1>
           <ConnectionIndicator />
         </header>

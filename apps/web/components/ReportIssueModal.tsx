@@ -3,17 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./Button";
 
-const REPORT_TO = "harishtaskar001@gmail.com";
-
 function emailLooksValid(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 }
 
-/** Report-an-issue modal: collects email + description, sends via the user's mail client. */
+type Status = "idle" | "sending" | "sent" | "error";
+
+/** Report-an-issue modal: collects email + description, sent via the Resend API route. */
 export function ReportIssueModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [desc, setDesc] = useState("");
-  const [sent, setSent] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
+  const [error, setError] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -23,14 +24,29 @@ export function ReportIssueModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const canSend = emailLooksValid(email) && desc.trim().length >= 5;
+  const canSend = emailLooksValid(email) && desc.trim().length >= 5 && status !== "sending";
 
-  const send = () => {
+  const send = async () => {
     if (!canSend) return;
-    const subject = encodeURIComponent("wordspy — issue / improvement");
-    const body = encodeURIComponent(`From: ${email.trim()}\n\n${desc.trim()}`);
-    window.location.href = `mailto:${REPORT_TO}?subject=${subject}&body=${body}`;
-    setSent(true);
+    setStatus("sending");
+    setError(null);
+    try {
+      const res = await fetch("/api/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), description: desc.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (res.ok && data.ok) {
+        setStatus("sent");
+      } else {
+        setStatus("error");
+        setError(data.error ?? "Couldn't send. Try again.");
+      }
+    } catch {
+      setStatus("error");
+      setError("Network error. Try again.");
+    }
   };
 
   return (
@@ -49,11 +65,9 @@ export function ReportIssueModal({ onClose }: { onClose: () => void }) {
           Report an issue
         </h2>
 
-        {sent ? (
+        {status === "sent" ? (
           <>
-            <p className="text-[13px] font-bold">
-              Thanks! Your mail app should be open with the report — just hit send.
-            </p>
+            <p className="text-[13px] font-bold">Thanks! Your report was sent. 🙌</p>
             <Button ref={closeRef} variant="primary" className="w-full" onClick={onClose}>
               Done
             </Button>
@@ -82,17 +96,24 @@ export function ReportIssueModal({ onClose }: { onClose: () => void }) {
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
                 rows={4}
-                maxLength={1000}
+                maxLength={2000}
                 placeholder="What happened, or what would make it better?"
                 className="border-[3px] border-ink bg-surface p-3 font-bold text-ink focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink"
               />
             </div>
+
+            {error && (
+              <p role="alert" className="text-[12px] font-bold text-imposter">
+                {error}
+              </p>
+            )}
+
             <div className="flex gap-2">
               <Button ref={closeRef} variant="ghost" className="flex-1" onClick={onClose}>
                 Cancel
               </Button>
               <Button variant="primary" className="flex-1" disabled={!canSend} onClick={send}>
-                Send
+                {status === "sending" ? "Sending…" : "Send"}
               </Button>
             </div>
           </>

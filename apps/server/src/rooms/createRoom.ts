@@ -11,17 +11,10 @@ export type ValidationResult =
   | { ok: true; username: string; settings: RoomSettings }
   | { ok: false; error: string };
 
-/** Validate an untrusted create-room payload from the wire. */
-export function validateCreateRoom(req: unknown): ValidationResult {
-  if (typeof req !== "object" || req === null) {
-    return { ok: false, error: "Malformed request." };
-  }
-  const { username, settings } = req as Partial<CreateRoomRequest>;
+export type SettingsResult = { ok: true; settings: RoomSettings } | { ok: false; error: string };
 
-  const name = validateUsername(username);
-  if (!name.ok) {
-    return { ok: false, error: name.error ?? "Invalid username." };
-  }
+/** Validate an untrusted room-settings object. */
+export function validateSettings(settings: unknown): SettingsResult {
   if (typeof settings !== "object" || settings === null) {
     return { ok: false, error: "Missing settings." };
   }
@@ -39,10 +32,22 @@ export function validateCreateRoom(req: unknown): ValidationResult {
   if (typeof isPrivate !== "boolean") {
     return { ok: false, error: "Invalid privacy setting." };
   }
+  return { ok: true, settings: { category, discussionSeconds, maxPlayers, isPrivate } as RoomSettings };
+}
 
-  return {
-    ok: true,
-    username: name.value,
-    settings: { category, discussionSeconds, maxPlayers, isPrivate } as RoomSettings,
-  };
+/** Validate an untrusted create-room payload from the wire. */
+export function validateCreateRoom(req: unknown): ValidationResult {
+  if (typeof req !== "object" || req === null) {
+    return { ok: false, error: "Malformed request." };
+  }
+  const { username, settings } = req as Partial<CreateRoomRequest>;
+
+  const name = validateUsername(username);
+  if (!name.ok) {
+    return { ok: false, error: name.error ?? "Invalid username." };
+  }
+  const s = validateSettings(settings);
+  if (!s.ok) return s;
+
+  return { ok: true, username: name.value, settings: s.settings };
 }

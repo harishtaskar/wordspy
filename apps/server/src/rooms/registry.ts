@@ -24,8 +24,17 @@ export interface Player {
   eliminatedRound?: number;
   /** Match score, computed at game-over. */
   score: number;
+  /** Stable avatar palette index (distinct per player within the room). */
+  colorIndex: number;
   /** Secret role, set at game start. NEVER included in any broadcast. */
   role?: "crew" | "imposter";
+}
+
+/** Smallest avatar colour index not already used by a player in the room. */
+function nextColorIndex(room: Room): number {
+  const used = new Set([...room.players.values()].map((p) => p.colorIndex));
+  for (let i = 0; i < 10; i++) if (!used.has(i)) return i;
+  return room.players.size % 10;
 }
 
 /** Server-internal room. Holds live state; never sent to clients directly. */
@@ -92,7 +101,7 @@ export function createRoom(host: { id: string; username: string }, settings: Roo
     players: new Map([
       [
         host.id,
-        { id: host.id, username: host.username, isHost: true, isReady: false, eliminated: false, score: 0 },
+        { id: host.id, username: host.username, isHost: true, isReady: false, eliminated: false, score: 0, colorIndex: 0 },
       ],
     ]),
     votes: new Map<string, string>(),
@@ -130,6 +139,7 @@ export function addPlayer(code: string, player: { id: string; username: string }
     isReady: false,
     eliminated: false,
     score: 0,
+    colorIndex: nextColorIndex(room),
   });
   return { ok: true, room };
 }
@@ -304,9 +314,9 @@ export function setWinner(room: Room, winner: GameWinner): void {
   if (room.winner) return; // already decided — don't let a race overwrite it
   room.winner = winner;
   room.phase = "game-over";
-  const scores = computeScores(room); // PRD §10
+  const scores = computeScores(room); // PRD §10 — this match's points
   for (const p of room.players.values()) {
-    p.score = scores[p.id] ?? 0;
+    p.score += scores[p.id] ?? 0; // accumulate across matches ("Continue")
   }
 }
 
@@ -360,9 +370,23 @@ export function resetForRematch(room: Room): void {
     p.eliminatedRound = undefined;
     p.role = undefined;
     p.isReady = false;
-    p.score = 0;
+    // KEEP p.score — points carry across matches ("Continue").
   }
-  // KEEP: players, usedWords (no-repeat across the session), settings, hostId.
+  // KEEP: players, usedWords (no-repeat across the session), settings, hostId, scores.
+}
+
+export type UpdateSettingsResult = { ok: true; room: Room } | { ok: false; error: string };
+
+/** Host updates room settings (only in lobby or after a match — never mid-game). */
+export function updateRoomSettings(code: string, hostId: string, settings: RoomSettings): UpdateSettingsResult {
+  const room = rooms.get(code);
+  if (!room) return { ok: false, error: "Room not found." };
+  if (room.hostId !== hostId) return { ok: false, error: "Only the host can change settings." };
+  if (room.phase !== "lobby" && room.phase !== "game-over") {
+    return { ok: false, error: "Can't change settings mid-match." };
+  }
+  room.settings = settings;
+  return { ok: true, room };
 }
 
 export type PlayAgainResult = { ok: true; room: Room } | { ok: false; error: string };
@@ -414,6 +438,7 @@ export function toSummary(room: Room): RoomSummary {
     isReady: p.isReady,
     isEliminated: p.eliminated,
     score: p.score,
+    colorIndex: p.colorIndex,
   }));
   const isOver = room.phase === "game-over";
   return {

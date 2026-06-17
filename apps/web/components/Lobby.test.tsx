@@ -27,8 +27,8 @@ const room: RoomSummary = {
   settings: DEFAULT_ROOM_SETTINGS,
   hostId: "host",
   players: [
-    { id: "host", username: "Aanya", isHost: true, isReady: true, isEliminated: false, score: 0 },
-    { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0 },
+    { id: "host", username: "Aanya", isHost: true, isReady: true, isEliminated: false, score: 0, colorIndex: 0 },
+    { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0, colorIndex: 0 },
   ],
 };
 
@@ -63,9 +63,9 @@ describe("Lobby", () => {
     const three: RoomSummary = {
       ...room,
       players: [
-        { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 0 },
-        { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0 },
-        { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false, score: 0 },
+        { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 0, colorIndex: 0 },
+        { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0, colorIndex: 0 },
+        { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false, score: 0, colorIndex: 0 },
       ],
     };
     render(<Lobby room={three} />);
@@ -80,8 +80,8 @@ describe("Lobby", () => {
     const two: RoomSummary = {
       ...room,
       players: [
-        { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 0 },
-        { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0 },
+        { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 0, colorIndex: 0 },
+        { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0, colorIndex: 0 },
       ],
     };
     const { rerender } = render(<Lobby room={two} />);
@@ -90,7 +90,7 @@ describe("Lobby", () => {
 
     const three: RoomSummary = {
       ...two,
-      players: [...two.players, { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false, score: 0 }],
+      players: [...two.players, { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false, score: 0, colorIndex: 0 }],
     };
     rerender(<Lobby room={three} />);
     fireEvent.click(screen.getByRole("button", { name: /start game/i }));
@@ -122,7 +122,7 @@ describe("Lobby", () => {
     const migrated: RoomSummary = {
       ...room,
       hostId: "p2",
-      players: [{ id: "p2", username: "Rex", isHost: true, isReady: false, isEliminated: false, score: 0 }],
+      players: [{ id: "p2", username: "Rex", isHost: true, isReady: false, isEliminated: false, score: 0, colorIndex: 0 }],
     };
     rerender(<Lobby room={migrated} />);
     expect(screen.getByText(/host now/i)).toBeTruthy();

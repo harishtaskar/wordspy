@@ -26,9 +26,9 @@ const room: RoomSummary = {
   settings: DEFAULT_ROOM_SETTINGS,
   hostId: "host",
   players: [
-    { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 270 },
-    { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0 },
-    { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false, score: 170 },
+    { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 270, colorIndex: 0 },
+    { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0, colorIndex: 0 },
+    { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false, score: 170, colorIndex: 0 },
   ],
 };
 
@@ -53,16 +53,20 @@ describe("WinnerReveal", () => {
     expect(screen.getByText(/imposter wins/i)).toBeTruthy();
   });
 
-  it("host can Play Again → emits room:playAgain", () => {
+  it("host can Continue → emits room:playAgain", () => {
     render(<WinnerReveal room={room} />); // me = host
-    fireEvent.click(screen.getByRole("button", { name: /play again/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
     expect(emit).toHaveBeenCalledWith("room:playAgain", { code: "ABCDE" }, expect.any(Function));
   });
 
-  it("non-host sees a waiting note, no Play Again button", () => {
+  it("host can open Change Settings; non-host sees a waiting note", () => {
+    render(<WinnerReveal room={room} />); // host
+    expect(screen.getByRole("button", { name: /change settings/i })).toBeTruthy();
+
+    cleanup();
     useConnectionStore.setState({ status: "connected", socketId: "p2", protocolVersion: 1 });
     render(<WinnerReveal room={room} />);
-    expect(screen.queryByRole("button", { name: /play again/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /continue/i })).toBeNull();
     expect(screen.getByText(/waiting for the host/i)).toBeTruthy();
   });
 });

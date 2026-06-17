@@ -12,6 +12,8 @@ import {
   kickPlayer,
   startGame,
   playAgain,
+  resetForRematch,
+  updateRoomSettings,
   castVote,
   resolveRound,
   nextAfterResult,
@@ -213,6 +215,52 @@ describe("kickPlayer", () => {
     room.phase = "discussion";
     expect(kickPlayer(room.code, "host", "p2")).toMatchObject({ ok: false });
     expect(room.players.has("p2")).toBe(true);
+  });
+});
+
+describe("cumulative scoring + updateRoomSettings (improvements)", () => {
+  function scoredRoom() {
+    const room = createRoom({ id: "imp", username: "Imp" }, DEFAULT_ROOM_SETTINGS);
+    addPlayer(room.code, { id: "c1", username: "C1" });
+    room.round = 1;
+    room.imposterId = "imp";
+    room.imposterCaughtRound = 1;
+    room.correctVoters = new Set(["c1"]);
+    return room;
+  }
+
+  it("scores accumulate across matches via setWinner + resetForRematch", () => {
+    const room = scoredRoom();
+    setWinner(room, "crew"); // c1: 150 win + 100 correct + 20 survive = 270
+    expect(room.players.get("c1")!.score).toBe(270);
+    resetForRematch(room); // keep score
+    expect(room.players.get("c1")!.score).toBe(270);
+    // second match, same facts
+    room.round = 1;
+    room.imposterCaughtRound = 1;
+    room.correctVoters = new Set(["c1"]);
+    setWinner(room, "crew");
+    expect(room.players.get("c1")!.score).toBe(540); // accumulated
+  });
+
+  it("each player gets a distinct avatar colorIndex", () => {
+    const room = createRoom({ id: "host", username: "Aanya" }, DEFAULT_ROOM_SETTINGS);
+    addPlayer(room.code, { id: "p2", username: "Rex" });
+    addPlayer(room.code, { id: "p3", username: "Mo" });
+    const idxs = toSummary(room).players.map((p) => p.colorIndex);
+    expect(new Set(idxs).size).toBe(3); // all distinct
+  });
+
+  it("host updates settings in lobby + game-over, rejected mid-match / non-host", () => {
+    const room = createRoom({ id: "host", username: "Aanya" }, DEFAULT_ROOM_SETTINGS);
+    const next = { ...DEFAULT_ROOM_SETTINGS, category: "movies" as const, maxPlayers: 4 as const };
+    expect(updateRoomSettings(room.code, "host", next).ok).toBe(true);
+    expect(room.settings.category).toBe("movies");
+    room.phase = "discussion";
+    expect(updateRoomSettings(room.code, "host", next)).toMatchObject({ ok: false });
+    room.phase = "game-over";
+    expect(updateRoomSettings(room.code, "host", next).ok).toBe(true);
+    expect(updateRoomSettings(room.code, "p2", next)).toMatchObject({ ok: false }); // non-host
   });
 });
 
@@ -499,7 +547,7 @@ describe("playAgain (4.6)", () => {
     return room;
   }
 
-  it("resets to lobby keeping players + usedWords, scores cleared", () => {
+  it("resets to lobby keeping players + usedWords + scores (Continue)", () => {
     const room = endedRoom();
     const res = playAgain(room.code, "host");
     expect(res.ok).toBe(true);
@@ -510,7 +558,7 @@ describe("playAgain (4.6)", () => {
     expect(room.secretWord).toBeUndefined();
     expect(room.imposterId).toBeUndefined();
     const p2 = room.players.get("p2")!;
-    expect(p2.score).toBe(0);
+    expect(p2.score).toBe(100); // points carry across matches
     expect(p2.eliminated).toBe(false);
     expect(p2.role).toBeUndefined();
     expect(room.usedWords.has("Pizza")).toBe(true); // no-repeat across session

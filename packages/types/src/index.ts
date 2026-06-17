@@ -132,6 +132,8 @@ export interface PlayerSummary {
   isEliminated: boolean;
   /** Match score (computed at game-over). */
   score: number;
+  /** Stable avatar palette index (distinct per player). */
+  colorIndex: number;
 }
 
 /** Wire-safe view of a room broadcast to its members. */
@@ -252,6 +254,11 @@ export interface ClientToServerEvents {
   "room:start": (req: StartRequest, ack: (res: AckResponse<RoomSummary>) => void) => void;
   /** Host restarts with the same players (game-over → lobby). */
   "room:playAgain": (req: { code: string }, ack: (res: AckResponse<RoomSummary>) => void) => void;
+  /** Host updates room settings (lobby or after a match). */
+  "room:updateSettings": (
+    req: { code: string; settings: RoomSettings },
+    ack: (res: AckResponse<RoomSummary>) => void,
+  ) => void;
   /** Voluntarily leave a room (distinct from disconnect). */
   "room:leave": (req: { code: string }) => void;
   /** Send a discussion chat message (fire-and-forget; server validates). */

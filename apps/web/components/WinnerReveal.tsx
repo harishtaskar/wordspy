@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import confetti from "canvas-confetti";
 import type { RoomSummary } from "@wordspy/types";
 import { Button } from "./Button";
 import { Avatar } from "./Avatar";
+import { RoomSettingsEditor } from "./RoomSettingsEditor";
 import { getSocket } from "@/lib/socket";
 import { useConnectionStore } from "@/store/connection";
 
@@ -29,7 +30,8 @@ export function WinnerReveal({ room }: { room: RoomSummary }) {
     burst(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
   }, [crewWon]);
 
-  const playAgain = () => {
+  const [editing, setEditing] = useState(false);
+  const cont = () => {
     getSocket().emit("room:playAgain", { code: room.code }, () => {});
   };
 
@@ -66,7 +68,7 @@ export function WinnerReveal({ room }: { room: RoomSummary }) {
           {podium.map((p, i) => (
             <li key={p.id} className="flex items-center gap-2 border-2 border-ink bg-bg px-2 py-[6px]">
               <span className="text-[18px]">{MEDALS[i]}</span>
-              <Avatar id={p.id} name={p.username} size={26} />
+              <Avatar id={p.id} name={p.username} size={26} colorIndex={p.colorIndex} />
               <span className="text-[14px] font-bold">
                 {p.username}
                 {p.id === myId ? " (you)" : ""}
@@ -86,7 +88,7 @@ export function WinnerReveal({ room }: { room: RoomSummary }) {
             {ranked.slice(3).map((p, i) => (
               <li key={p.id} className="flex items-center gap-2 text-[13px] font-bold">
                 <span className="w-4 text-muted">{i + 4}</span>
-                <Avatar id={p.id} name={p.username} size={22} />
+                <Avatar id={p.id} name={p.username} size={22} colorIndex={p.colorIndex} />
                 <span>{p.username}</span>
                 <span className="ml-auto" style={{ fontFamily: "var(--font-display)" }}>+{p.score}</span>
               </li>
@@ -96,12 +98,19 @@ export function WinnerReveal({ room }: { room: RoomSummary }) {
       )}
 
       {isHost ? (
-        <Button variant="primary" className="w-full" onClick={playAgain}>
-          Play Again ↻
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button variant="primary" className="w-full" onClick={cont}>
+            Continue ▸
+          </Button>
+          <Button variant="ghost" className="w-full" onClick={() => setEditing(true)}>
+            Change Settings
+          </Button>
+        </div>
       ) : (
-        <p className="text-center text-[12px] text-muted">Waiting for the host to restart…</p>
+        <p className="text-center text-[12px] text-muted">Waiting for the host to continue…</p>
       )}
+
+      {editing && <RoomSettingsEditor room={room} onClose={() => setEditing(false)} />}
     </section>
   );
 }

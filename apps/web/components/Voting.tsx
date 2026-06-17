@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { type RoomSummary, type AckResponse } from "@wordspy/types";
 import { Button } from "./Button";
+import { Avatar } from "./Avatar";
 import { getSocket } from "@/lib/socket";
 import { useConnectionStore } from "@/store/connection";
 
@@ -86,14 +87,15 @@ export function Voting({ room }: { room: RoomSummary }) {
             aria-pressed={selected === p.id}
             onClick={() => setSelected(p.id)}
             className={[
-              "min-h-[44px] border-[3px] border-ink px-3 text-left text-[14px] font-extrabold uppercase",
+              "flex min-h-[44px] items-center gap-2 border-[3px] border-ink px-3 text-left text-[14px] font-extrabold uppercase",
               "focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink",
               "disabled:opacity-50",
               selected === p.id ? "bg-imposter text-white" : "bg-surface text-ink",
             ].join(" ")}
           >
-            {p.username}
-            {selected === p.id ? " ✓" : ""}
+            <Avatar id={p.id} name={p.username} size={24} colorIndex={p.colorIndex} />
+            <span>{p.username}</span>
+            {selected === p.id ? <span className="ml-auto">✓</span> : null}
           </button>
         ))}
       </div>

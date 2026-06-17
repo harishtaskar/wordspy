@@ -18,6 +18,7 @@ import {
   kickPlayer,
   startGame,
   playAgain,
+  updateRoomSettings,
   castVote,
   resolveRound,
   nextAfterResult,
@@ -31,7 +32,7 @@ import {
   toSummary,
   type Room,
 } from "./rooms/registry.js";
-import { validateCreateRoom } from "./rooms/createRoom.js";
+import { validateCreateRoom, validateSettings } from "./rooms/createRoom.js";
 import { validateJoin } from "./rooms/joinRoom.js";
 import { assignRoles } from "./rooms/assignRoles.js";
 import { phasePlan } from "./rooms/phasePlan.js";
@@ -301,6 +302,23 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       if (typeof ack === "function") ack({ ok: true, data: summary });
       io.to(code).emit("room:state", summary);
       console.log(`[room] ${code} rematch → lobby`);
+    });
+
+    socket.on("room:updateSettings", (req, ack) => {
+      const code = typeof req?.code === "string" ? req.code.trim().toUpperCase() : "";
+      const valid = validateSettings(req?.settings);
+      if (!valid.ok) {
+        if (typeof ack === "function") ack({ ok: false, error: valid.error });
+        return;
+      }
+      const result = updateRoomSettings(code, socket.id, valid.settings);
+      if (!result.ok) {
+        if (typeof ack === "function") ack({ ok: false, error: result.error });
+        return;
+      }
+      const summary = toSummary(result.room);
+      if (typeof ack === "function") ack({ ok: true, data: summary });
+      io.to(code).emit("room:state", summary);
     });
 
     socket.on("room:kick", (req, ack) => {

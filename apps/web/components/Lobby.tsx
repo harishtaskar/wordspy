@@ -85,7 +85,7 @@ export function Lobby({ room }: { room: RoomSummary }) {
             key={p.id}
             className="flex items-center gap-2 border-[3px] border-ink bg-surface px-3 py-2 font-bold"
           >
-            <Avatar id={p.id} name={p.username} size={26} />
+            <Avatar id={p.id} name={p.username} size={26} colorIndex={p.colorIndex} />
             <span className="text-[14px]">
               {p.username}
               {p.id === myId ? " (you)" : ""}

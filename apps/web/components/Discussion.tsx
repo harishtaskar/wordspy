@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CHAT_MAX_LENGTH, type RoomSummary } from "@wordspy/types";
 import { Timer } from "./Timer";
-import { Avatar, avatarColor } from "./Avatar";
+import { Avatar, avatarTint } from "./Avatar";
 import { getSocket } from "@/lib/socket";
 import { useChatStore } from "@/store/chat";
 import { useConnectionStore } from "@/store/connection";
@@ -48,26 +48,26 @@ export function Discussion({ room }: { room: RoomSummary }) {
       <div
         ref={feedRef}
         aria-label="Discussion chat"
-        className="flex h-[260px] flex-col gap-2 overflow-y-auto border-[3px] border-ink bg-bg p-2"
+        className="flex h-[44vh] min-h-[300px] flex-col overflow-y-auto border-[3px] border-ink bg-bg"
       >
         {messages.length === 0 && (
           <p className="m-auto text-[12px] text-muted">Drop a clue…</p>
         )}
         {messages.map((m, i) => {
           const mine = m.playerId === myId;
+          const colorIndex = room.players.find((p) => p.id === m.playerId)?.colorIndex;
           return (
-            <div key={`${m.ts}-${i}`} className={`flex items-start gap-2 ${mine ? "flex-row-reverse" : ""}`}>
-              <Avatar id={m.playerId} name={m.username} size={26} />
-              <div className={`max-w-[78%] ${mine ? "items-end text-right" : ""} flex flex-col`}>
-                <span className="px-1 text-[10px] font-bold uppercase tracking-[1px] text-muted">
+            <div
+              key={`${m.ts}-${i}`}
+              className="flex w-full items-start gap-2 border-b-2 border-ink px-3 py-2 last:border-b-0"
+              style={{ background: mine ? "#FFF3C4" : avatarTint(m.playerId, colorIndex) }}
+            >
+              <Avatar id={m.playerId} name={m.username} size={28} colorIndex={colorIndex} />
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-[1px] text-muted">
                   {mine ? "You" : m.username}
                 </span>
-                <span
-                  className="border-2 border-ink px-3 py-[6px] text-[13px] font-bold"
-                  style={{ background: mine ? "#FFF3C4" : `${avatarColor(m.playerId)}1A` }}
-                >
-                  {m.text}
-                </span>
+                <p className="break-words text-[14px] font-bold leading-snug">{m.text}</p>
               </div>
             </div>
           );

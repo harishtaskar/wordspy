@@ -13,9 +13,10 @@ export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
  */
 function resolveSocketUrl(): string {
   const raw = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
-  const url = raw && raw.length > 0 ? raw : "http://localhost:4000";
+  let url = raw && raw.length > 0 ? raw : "http://localhost:4000";
+  // Tolerate a bare host (no scheme) — assume https (prod hosts are TLS).
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
   try {
-    // Fail loud on a malformed value rather than passing garbage to io().
     new URL(url);
   } catch {
     throw new Error(`Invalid NEXT_PUBLIC_SOCKET_URL: "${url}". Must be an absolute URL.`);

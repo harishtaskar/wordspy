@@ -35,8 +35,17 @@ const ICONS: Array<() => ReactNode> = [
 const COLS = 12;
 const ROWS = 20;
 
-/** Fixed, subtle, dense light-gray game-icon pattern (paper bg unchanged). */
-export function BackgroundDecor() {
+export type DecorTone = "neutral" | "crew" | "imposter";
+
+/** Icon ink colour per role tone (neutral = subtle gray on paper). */
+const TONE_TEXT: Record<DecorTone, string> = {
+  neutral: "text-ink/[0.06]",
+  crew: "text-crew/[0.16]",
+  imposter: "text-imposter/[0.16]",
+};
+
+/** Fixed, dense game-icon pattern; tinted by the player's role when in a match. */
+export function BackgroundDecor({ tone = "neutral" }: { tone?: DecorTone }) {
   const cells: ReactNode[] = [];
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -58,7 +67,10 @@ export function BackgroundDecor() {
     }
   }
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden text-ink/[0.06]">
+    <div
+      aria-hidden
+      className={`pointer-events-none fixed inset-0 z-0 overflow-hidden ${TONE_TEXT[tone]}`}
+    >
       {cells}
     </div>
   );

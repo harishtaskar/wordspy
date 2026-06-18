@@ -10,6 +10,7 @@ import { useRoleStore } from "@/store/role";
 import { useChatStore } from "@/store/chat";
 import { Lobby } from "./Lobby";
 import { RoleReveal } from "./RoleReveal";
+import { RoleBanner } from "./RoleBanner";
 import { Discussion } from "./Discussion";
 import { Voting } from "./Voting";
 import { VoteResultReveal } from "./VoteResultReveal";
@@ -93,6 +94,7 @@ export function RoomView({ room }: { room: RoomSummary }) {
   if (liveRoom.phase === "discussion") {
     return (
       <section className="flex flex-col gap-4">
+        {role && <RoleBanner role={role} />}
         <Discussion room={liveRoom} />
       </section>
     );
@@ -102,6 +104,7 @@ export function RoomView({ room }: { room: RoomSummary }) {
   if (liveRoom.phase === "voting") {
     return (
       <section className="flex flex-col gap-4">
+        {role && <RoleBanner role={role} />}
         <Voting room={liveRoom} />
       </section>
     );

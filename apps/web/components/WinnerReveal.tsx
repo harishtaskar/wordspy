@@ -11,6 +11,34 @@ import { useConnectionStore } from "@/store/connection";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
+/** Plain-language reason the match ended the way it did — derived from server state. */
+function winReason(room: RoomSummary): { title: string; body: string } {
+  if (room.winReason === "imposter-left") {
+    return {
+      title: "🚪 The Imposter bailed",
+      body: "They quit mid-match — Crew wins by forfeit. No final guess.",
+    };
+  }
+  // The imposter was voted out at the terminal round (then took a final guess).
+  const caught = room.voteResult?.wasImposter ?? false;
+  if (room.winner === "crew") {
+    return {
+      title: "🎯 Imposter exposed",
+      body: "Crew voted out the imposter, who couldn't guess the secret word. Crew takes it.",
+    };
+  }
+  if (caught) {
+    return {
+      title: "🃏 Stolen at the buzzer",
+      body: "Caught — but the imposter guessed the secret word and steals the win.",
+    };
+  }
+  return {
+    title: "🕵 Imposter slipped away",
+    body: "The crew never pinned the imposter across the rounds — the win is theirs.",
+  };
+}
+
 /** End screen: confetti, winner, revealed word + imposter, podium + scoreboard, host rematch. */
 export function WinnerReveal({ room }: { room: RoomSummary }) {
   const myId = useConnectionStore((s) => s.socketId);
@@ -46,14 +74,15 @@ export function WinnerReveal({ room }: { room: RoomSummary }) {
         </p>
       </div>
 
-      {room.winReason === "imposter-left" && (
-        <div role="status" className="border-[3px] border-ink bg-accent px-3 py-2 text-center">
-          <p className="text-[13px] font-extrabold uppercase">🚪 The Imposter bailed</p>
-          <p className="mt-1 text-[12px] font-bold">
-            They quit mid-match — Crew wins by forfeit. No final guess.
-          </p>
-        </div>
-      )}
+      {(() => {
+        const reason = winReason(room);
+        return (
+          <div role="status" className="border-[3px] border-ink bg-accent px-3 py-2 text-center">
+            <p className="text-[13px] font-extrabold uppercase">{reason.title}</p>
+            <p className="mt-1 text-[12px] font-bold">{reason.body}</p>
+          </div>
+        );
+      })()}
 
       <div className="flex gap-3">
         <div className="flex-1 border-[3px] border-ink bg-surface p-3 text-center shadow-[var(--shadow-card)]">

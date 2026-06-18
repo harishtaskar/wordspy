@@ -12,3 +12,9 @@ coverage/
 .claude/
 _bmad/
 _bmad-output/
+
+# Internal planning docs (not for public repo)
+implementation-plan.md
+improvements.md
+prd.md
+ux_specifications.md

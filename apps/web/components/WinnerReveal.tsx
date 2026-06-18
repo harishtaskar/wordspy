@@ -7,7 +7,9 @@ import { Button } from "./Button";
 import { Avatar } from "./Avatar";
 import { RoomSettingsEditor } from "./RoomSettingsEditor";
 import { getSocket } from "@/lib/socket";
+import { playSfx } from "@/lib/sound";
 import { useConnectionStore } from "@/store/connection";
+import { useRoleStore } from "@/store/role";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -23,18 +25,18 @@ function winReason(room: RoomSummary): { title: string; body: string } {
   const caught = room.voteResult?.wasImposter ?? false;
   if (room.winner === "crew") {
     return {
-      title: "🎯 Imposter exposed",
+      title: "Imposter exposed",
       body: "Crew voted out the imposter, who couldn't guess the secret word. Crew takes it.",
     };
   }
   if (caught) {
     return {
-      title: "🃏 Stolen at the buzzer",
+      title: "Stolen at the buzzer",
       body: "Caught — but the imposter guessed the secret word and steals the win.",
     };
   }
   return {
-    title: "🕵 Imposter slipped away",
+    title: "Imposter slipped away",
     body: "The crew never pinned the imposter across the rounds — the win is theirs.",
   };
 }
@@ -42,10 +44,20 @@ function winReason(room: RoomSummary): { title: string; body: string } {
 /** End screen: confetti, winner, revealed word + imposter, podium + scoreboard, host rematch. */
 export function WinnerReveal({ room }: { room: RoomSummary }) {
   const myId = useConnectionStore((s) => s.socketId);
+  const role = useRoleStore((s) => s.role);
   const isHost = room.hostId === myId;
   const crewWon = room.winner === "crew";
   const ranked = [...room.players].sort((a, b) => b.score - a.score);
   const podium = ranked.slice(0, 3);
+
+  // Win/lose sting from this player's perspective (role may be null for a
+  // spectator who joined late — stay silent then).
+  useEffect(() => {
+    if (!role) return;
+    const iWon = role.role === room.winner;
+    playSfx(iWon ? "win" : "lose");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Celebratory confetti, coloured by the winning side.
   useEffect(() => {

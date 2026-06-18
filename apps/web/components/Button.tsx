@@ -1,4 +1,5 @@
-import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type MouseEvent } from "react";
+import { playSfx } from "@/lib/sound";
 
 type Variant = "primary" | "crew" | "imposter" | "ghost";
 
@@ -18,12 +19,17 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * Press collapses the shadow and nudges +2,+2 (stamp feel). [DESIGN.md Components]
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "primary", className = "", children, ...rest },
+  { variant = "primary", className = "", children, onClick, ...rest },
   ref,
 ) {
+  const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
+    playSfx("click");
+    onClick?.(e);
+  };
   return (
     <button
       ref={ref}
+      onClick={handleClick}
       className={[
         "border-[3px] border-ink px-4 py-3 font-extrabold uppercase tracking-tight",
         "shadow-[var(--shadow-button)] transition-all",

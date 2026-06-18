@@ -5,6 +5,7 @@ import { CHAT_MAX_LENGTH, type RoomSummary } from "@wordspy/types";
 import { Timer } from "./Timer";
 import { Avatar, avatarTint } from "./Avatar";
 import { getSocket } from "@/lib/socket";
+import { playSfx } from "@/lib/sound";
 import { useChatStore } from "@/store/chat";
 import { useConnectionStore } from "@/store/connection";
 
@@ -26,6 +27,7 @@ export function Discussion({ room }: { room: RoomSummary }) {
     const text = draft.trim();
     if (!text) return;
     getSocket().emit("chat:send", { code: room.code, text });
+    playSfx("pop");
     setDraft("");
   };
 

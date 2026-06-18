@@ -37,8 +37,10 @@ function Toggle({
 export function Settings({ onClose }: { onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const soundEnabled = useSettings((s) => s.soundEnabled);
+  const musicEnabled = useSettings((s) => s.musicEnabled);
   const reducedMotion = useSettings((s) => s.reducedMotion);
   const setSoundEnabled = useSettings((s) => s.setSoundEnabled);
+  const setMusicEnabled = useSettings((s) => s.setMusicEnabled);
   const setReducedMotion = useSettings((s) => s.setReducedMotion);
 
   useEffect(() => {
@@ -70,6 +72,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </h2>
         <div className="mt-3 flex flex-col gap-2">
           <Toggle label="Sound effects" checked={soundEnabled} onChange={setSoundEnabled} />
+          <Toggle label="Background music" checked={musicEnabled} onChange={setMusicEnabled} />
           <Toggle label="Reduced motion" checked={reducedMotion} onChange={setReducedMotion} />
         </div>
         <Button ref={closeRef} variant="primary" className="mt-4 w-full" onClick={onClose}>

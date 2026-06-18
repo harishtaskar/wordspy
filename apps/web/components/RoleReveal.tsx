@@ -3,12 +3,18 @@
 import { useEffect, useState } from "react";
 import type { RolePayload } from "@wordspy/types";
 import { Button } from "./Button";
+import { playSfx } from "@/lib/sound";
 
 const AUTO_ADVANCE_SECONDS = 5;
 
 /** Renders the per-socket role payload from Story 2.2. Crew see the word; Imposter never does. */
 export function RoleReveal({ role, onDone }: { role: RolePayload; onDone: () => void }) {
   const [left, setLeft] = useState(AUTO_ADVANCE_SECONDS);
+
+  // Sting on reveal.
+  useEffect(() => {
+    playSfx("reveal");
+  }, []);
 
   useEffect(() => {
     if (left <= 0) {

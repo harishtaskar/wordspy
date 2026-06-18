@@ -5,6 +5,7 @@ import { type RoomSummary, type AckResponse } from "@wordspy/types";
 import { Button } from "./Button";
 import { Avatar } from "./Avatar";
 import { getSocket } from "@/lib/socket";
+import { playSfx } from "@/lib/sound";
 import { useConnectionStore } from "@/store/connection";
 
 /** Anonymous voting: pick a suspect, submit once (final), watch live progress. */
@@ -36,8 +37,10 @@ export function Voting({ room }: { room: RoomSummary }) {
       "vote:cast",
       { code: room.code, targetId: selected },
       (res: AckResponse<RoomSummary>) => {
-        if (res.ok) setSubmitted(true);
-        else setError(res.error);
+        if (res.ok) {
+          setSubmitted(true);
+          playSfx("vote");
+        } else setError(res.error);
       },
     );
   };

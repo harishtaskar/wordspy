@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useSocket } from "@/hooks/useSocket";
+import { useSoundController } from "@/hooks/useSoundController";
 import { useRoleStore } from "@/store/role";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { BackgroundDecor, type DecorTone } from "./BackgroundDecor";
@@ -21,6 +22,7 @@ const TONE_BG: Record<DecorTone, string> = {
  */
 export function AppShell({ children }: { children: ReactNode }) {
   useSocket();
+  useSoundController();
   const role = useRoleStore((s) => s.role);
   const tone: DecorTone = role?.role === "imposter" ? "imposter" : role?.role === "crew" ? "crew" : "neutral";
 

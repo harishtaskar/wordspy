@@ -4,8 +4,10 @@ import { safeStorage } from "@/lib/safeStorage";
 
 interface SettingsState {
   soundEnabled: boolean;
+  musicEnabled: boolean;
   reducedMotion: boolean;
   setSoundEnabled: (v: boolean) => void;
+  setMusicEnabled: (v: boolean) => void;
   setReducedMotion: (v: boolean) => void;
 }
 
@@ -18,8 +20,10 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       soundEnabled: true,
+      musicEnabled: true,
       reducedMotion: false,
       setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
+      setMusicEnabled: (musicEnabled) => set({ musicEnabled }),
       setReducedMotion: (reducedMotion) => set({ reducedMotion }),
     }),
     {

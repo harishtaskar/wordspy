@@ -16,15 +16,18 @@ export type Sfx =
 
 type Note = [freq: number, dur: number]; // dur in beats
 
-// Calm, slow C-major-pentatonic loop — gentle rises and falls, lots of held
-// notes and rests so it sits softly in the background rather than driving.
+// Playful, bouncy C-major hop — quick skipping notes with little leaps, the
+// kind of cheerful loop you'd hear in a cartoony party game.
 const MELODY: Note[] = [
-  [262, 2], [330, 2], [392, 2], [330, 2], // C  E  G  E
-  [294, 2], [392, 1], [440, 3],           // D  G  A (held)
-  [392, 2], [330, 2], [294, 2], [262, 2], // G  E  D  C
-  [196, 3], [262, 2], [220, 3],           // G(low) C  A(low), settle
+  [523, 1], [659, 1], [784, 1], [659, 1], // C5 E5 G5 E5 — skip up
+  [698, 1], [587, 1], [523, 2],           // F5 D5 C5 — settle
+  [587, 1], [698, 1], [784, 1], [880, 1], // D5 F5 G5 A5 — climb
+  [784, 1], [659, 1], [523, 2],           // G5 E5 C5 — land
+  [659, 1], [523, 1], [659, 1], [784, 1], // E5 C5 E5 G5 — bounce
+  [880, 1], [784, 1], [659, 2],           // A5 G5 E5 — wink
+  [523, 1], [659, 1], [587, 1], [523, 2], // C5 E5 D5 C5 — resolve
 ];
-const BEAT = 0.6; // seconds per beat — slower, relaxed tempo
+const BEAT = 0.19; // seconds per beat — quick, springy tempo
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
@@ -142,12 +145,13 @@ class SoundEngine {
     const t0 = ctx.currentTime + 0.02;
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
-    // Soft sine with a slow swell and long fade — no percussive attack.
-    osc.type = "sine";
+    // Plucky triangle: snappy attack + short decay so each note pops and leaves
+    // a little gap — that staccato bounce is what makes it feel playful.
+    osc.type = "triangle";
     osc.frequency.setValueAtTime(freq, t0);
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.6, t0 + dur * 0.35);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.98);
+    g.gain.exponentialRampToValueAtTime(0.8, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.6);
     osc.connect(g);
     g.connect(this.musicGain);
     osc.start(t0);

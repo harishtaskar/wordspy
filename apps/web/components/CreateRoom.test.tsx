@@ -44,7 +44,7 @@ describe("CreateRoom", () => {
 
     expect(emit).toHaveBeenCalledWith(
       "room:create",
-      { username: "Aanya", settings: DEFAULT_ROOM_SETTINGS },
+      expect.objectContaining({ username: "Aanya", settings: DEFAULT_ROOM_SETTINGS, sessionId: expect.any(String) }),
       expect.any(Function),
     );
     await waitFor(() => expect(screen.getByText("ABCDE")).toBeTruthy());

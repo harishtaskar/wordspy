@@ -98,6 +98,9 @@ export function Voting({ room }: { room: RoomSummary }) {
           >
             <Avatar id={p.id} name={p.username} size={24} colorIndex={p.colorIndex} />
             <span>{p.username}</span>
+            {p.isConnected === false && (
+              <span className="text-[9px] font-bold normal-case text-muted">reconnecting…</span>
+            )}
             {selected === p.id ? <span className="ml-auto">✓</span> : null}
           </button>
         ))}

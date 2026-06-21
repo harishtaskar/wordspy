@@ -14,6 +14,7 @@ import { validateUsername } from "@/lib/validateUsername";
 export function PublicRooms() {
   const router = useRouter();
   const username = usePlayerSession((s) => s.username);
+  const ensureSession = usePlayerSession((s) => s.ensureSession);
   const room = useRoomStore((s) => s.room);
   const setRoom = useRoomStore((s) => s.setRoom);
 
@@ -45,7 +46,9 @@ export function PublicRooms() {
   const join = (code: string) => {
     setError(null);
     setJoining(code);
-    getSocket().emit("room:join", { code, username }, (res: AckResponse<RoomSummary>) => {
+    ensureSession();
+    const sessionId = usePlayerSession.getState().sessionId ?? "";
+    getSocket().emit("room:join", { code, username, sessionId }, (res: AckResponse<RoomSummary>) => {
       setJoining(null);
       if (res.ok) {
         getSocket().emit("room:browseLeave");

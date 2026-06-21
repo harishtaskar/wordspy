@@ -2,14 +2,21 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ReportIssueModal } from "./ReportIssueModal";
+import { useRoomStore } from "@/store/room";
 
 const GITHUB_URL = "https://github.com/harishtaskar";
+
+/** Phases where a match is actively underway (info button hidden to avoid mid-game taps). */
+const IN_GAME_PHASES = new Set(["role-reveal", "discussion", "voting", "result", "final-guess"]);
 
 /** Bottom-left info button → menu (Report an issue · GitHub). */
 export function InfoMenu() {
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // Hide the whole info button once the game has started (lobby / game-over keep it).
+  const phase = useRoomStore((s) => s.room?.phase);
+  const inGame = !!phase && IN_GAME_PHASES.has(phase);
 
   // Close the menu on outside click / Escape.
   useEffect(() => {
@@ -25,6 +32,9 @@ export function InfoMenu() {
       window.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  // Game underway → hide the whole info affordance (no menu, no button).
+  if (inGame) return null;
 
   return (
     <>

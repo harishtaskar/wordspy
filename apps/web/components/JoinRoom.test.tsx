@@ -58,7 +58,11 @@ describe("JoinRoom", () => {
     render(<JoinRoom />);
     fireEvent.change(screen.getByLabelText(/room code/i), { target: { value: "ABCDE" } });
     fireEvent.click(screen.getByRole("button", { name: /join ▸/i }));
-    expect(emit).toHaveBeenCalledWith("room:join", { code: "ABCDE", username: "Rex" }, expect.any(Function));
+    expect(emit).toHaveBeenCalledWith(
+      "room:join",
+      expect.objectContaining({ code: "ABCDE", username: "Rex", sessionId: expect.any(String) }),
+      expect.any(Function),
+    );
     await waitFor(() => expect(screen.getByText("ABCDE")).toBeTruthy());
   });
 
@@ -91,6 +95,10 @@ describe("JoinRoom", () => {
     render(<JoinRoom />);
     fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: "Mo" } });
     fireEvent.click(screen.getByRole("button", { name: /join ▸/i }));
-    expect(emit).toHaveBeenCalledWith("room:join", { code: "ABCDE", username: "Mo" }, expect.any(Function));
+    expect(emit).toHaveBeenCalledWith(
+      "room:join",
+      { code: "ABCDE", username: "Mo", sessionId: "s1" },
+      expect.any(Function),
+    );
   });
 });

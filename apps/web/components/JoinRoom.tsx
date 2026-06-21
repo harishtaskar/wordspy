@@ -52,9 +52,11 @@ export function JoinRoom() {
     setError(null);
     setPending(true);
     setUsername(nameResult.value);
+    ensureSession();
+    const sessionId = usePlayerSession.getState().sessionId ?? "";
     getSocket().emit(
       "room:join",
-      { code, username: nameResult.value },
+      { code, username: nameResult.value, sessionId },
       (res: AckResponse<RoomSummary>) => {
         setPending(false);
         if (res.ok) setRoom(res.data);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import { DEFAULT_ROOM_SETTINGS, type RoomSummary } from "@wordspy/types";
 import { Discussion } from "./Discussion";
 import { useChatStore } from "@/store/chat";
@@ -51,10 +51,12 @@ describe("Discussion", () => {
       ],
     });
     render(<Discussion room={room} />);
-    expect(screen.getByText("Best when shared.")).toBeTruthy();
-    expect(screen.getByText("Comes in a box.")).toBeTruthy();
-    expect(screen.getByText("Aanya")).toBeTruthy(); // other sender label
-    expect(screen.getByText(/Rex \(You\)/)).toBeTruthy(); // p2 (me) label
+    // Scope to the chat feed — the roster aside also lists player names.
+    const feed = within(screen.getByLabelText(/discussion chat/i));
+    expect(feed.getByText("Best when shared.")).toBeTruthy();
+    expect(feed.getByText("Comes in a box.")).toBeTruthy();
+    expect(feed.getByText("Aanya")).toBeTruthy(); // other sender label
+    expect(feed.getByText(/Rex \(You\)/)).toBeTruthy(); // p2 (me) label
   });
 
   it("emits chat:send on send and clears the input", () => {

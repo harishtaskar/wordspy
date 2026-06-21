@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { PROTOCOL_VERSION } from "@wordspy/types";
+import { PROTOCOL_VERSION, type AckResponse, type RoomSummary } from "@wordspy/types";
 import { getSocket } from "@/lib/socket";
 import { useConnectionStore } from "@/store/connection";
+import { useRoomStore } from "@/store/room";
+import { usePlayerSession } from "@/store/session";
+import { useRoleStore } from "@/store/role";
+import { useChatStore } from "@/store/chat";
 
 /** How often the client pings the server for app-level liveness. */
 const HEARTBEAT_INTERVAL_MS = 3000;
@@ -45,11 +49,34 @@ export function useSocket(): void {
       heartbeatTimer = undefined;
     };
 
+    // After a transient drop the socket reconnects with a NEW id; if we still
+    // think we're in a room, reclaim that seat (and our score) via room:resume.
+    const tryResume = () => {
+      const current = useRoomStore.getState().room;
+      const sessionId = usePlayerSession.getState().sessionId;
+      if (!current || !sessionId) return;
+      socket.emit(
+        "room:resume",
+        { code: current.code, sessionId },
+        (res: AckResponse<RoomSummary>) => {
+          if (res.ok) {
+            useRoomStore.getState().setRoom(res.data);
+          } else {
+            // Seat is truly gone (grace lapsed / room closed) — drop back to home.
+            useRoomStore.getState().clearRoom();
+            useRoleStore.getState().clearRole();
+            useChatStore.getState().clear();
+          }
+        },
+      );
+    };
+
     const onConnect = () => {
       // Seed socketId immediately so state is correct even if welcome races/misses.
       setWelcome({ socketId: socket.id ?? "", protocolVersion: PROTOCOL_VERSION });
       setStatus("connected");
       startHeartbeat();
+      tryResume();
     };
 
     const onDisconnect = (reason: string) => {

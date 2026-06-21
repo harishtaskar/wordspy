@@ -17,9 +17,15 @@ import { computeScores } from "./computeScores.js";
 /** Server-internal player — keyed by socket id. */
 export interface Player {
   id: string;
+  /** Stable per-browser id (survives a socket reconnect); used to reclaim a seat. */
+  sessionId: string;
   username: string;
   isHost: boolean;
   isReady: boolean;
+  /** True while the socket is dropped but inside the reconnect grace window. */
+  disconnected?: boolean;
+  /** Grace timer that finalizes the departure if no reconnect arrives. */
+  disconnectTimer?: ReturnType<typeof setTimeout>;
   /** Voted out — spectating, cannot chat or vote. */
   eliminated: boolean;
   /** Round in which this player was eliminated (for scoring). */
@@ -94,7 +100,10 @@ export function deleteRoom(code: string): void {
 }
 
 /** Create a room with the given host. Returns the internal room. */
-export function createRoom(host: { id: string; username: string }, settings: RoomSettings): Room {
+export function createRoom(
+  host: { id: string; username: string; sessionId?: string },
+  settings: RoomSettings,
+): Room {
   const code = generateRoomCode(hasRoom);
   const room: Room = {
     code,
@@ -105,7 +114,7 @@ export function createRoom(host: { id: string; username: string }, settings: Roo
     players: new Map([
       [
         host.id,
-        { id: host.id, username: host.username, isHost: true, isReady: false, eliminated: false, score: 0, colorIndex: 0 },
+        { id: host.id, sessionId: host.sessionId ?? "", username: host.username, isHost: true, isReady: false, eliminated: false, score: 0, colorIndex: 0 },
       ],
     ]),
     votes: new Map<string, string>(),
@@ -124,7 +133,10 @@ export type AddPlayerResult =
   | { ok: false; error: string };
 
 /** Add a non-host player to a room, enforcing lobby/capacity/duplicate rules. */
-export function addPlayer(code: string, player: { id: string; username: string }): AddPlayerResult {
+export function addPlayer(
+  code: string,
+  player: { id: string; username: string; sessionId?: string },
+): AddPlayerResult {
   const room = rooms.get(code);
   if (!room) return { ok: false, error: "Room not found." };
   if (room.phase !== "lobby") return { ok: false, error: "Game already started." };
@@ -138,6 +150,7 @@ export function addPlayer(code: string, player: { id: string; username: string }
 
   room.players.set(player.id, {
     id: player.id,
+    sessionId: player.sessionId ?? "",
     username: player.username,
     isHost: false,
     isReady: false,
@@ -146,6 +159,48 @@ export function addPlayer(code: string, player: { id: string; username: string }
     colorIndex: nextColorIndex(room),
   });
   return { ok: true, room };
+}
+
+/** Find a player in a room by their stable session id (used on reconnect). */
+export function findPlayerBySession(room: Room, sessionId: string): Player | undefined {
+  if (!sessionId) return undefined;
+  for (const p of room.players.values()) {
+    if (p.sessionId === sessionId) return p;
+  }
+  return undefined;
+}
+
+/**
+ * Re-key a player from an old socket id to a new one after a reconnect, keeping
+ * roster order and fixing every id reference (votes, host, imposter). Preserves
+ * the player's score and all match state — the whole point of resume.
+ */
+export function rebindPlayer(room: Room, oldId: string, newId: string): void {
+  if (oldId === newId || !room.players.has(oldId)) return;
+  // Rebuild the map in-order so the roster doesn't reshuffle on reconnect.
+  const rebuilt = new Map<string, Player>();
+  for (const [id, p] of room.players) {
+    if (id === oldId) {
+      p.id = newId;
+      rebuilt.set(newId, p);
+    } else {
+      rebuilt.set(id, p);
+    }
+  }
+  room.players = rebuilt;
+
+  // Move the vote this player cast, and re-point any votes aimed at them.
+  if (room.votes.has(oldId)) {
+    const target = room.votes.get(oldId)!;
+    room.votes.delete(oldId);
+    room.votes.set(newId, target);
+  }
+  for (const [voter, target] of room.votes) {
+    if (target === oldId) room.votes.set(voter, newId);
+  }
+
+  if (room.hostId === oldId) room.hostId = newId;
+  if (room.imposterId === oldId) room.imposterId = newId;
 }
 
 export interface RemovePlayerResult {
@@ -163,6 +218,8 @@ export function removePlayer(code: string, id: string): RemovePlayerResult {
   if (!room) return { deleted: false };
 
   const wasHost = room.hostId === id;
+  const leaving = room.players.get(id);
+  if (leaving?.disconnectTimer) clearTimeout(leaving.disconnectTimer);
   room.players.delete(id);
   room.votes.delete(id); // drop any vote they had cast (stale otherwise)
   // Drop votes that targeted the leaver too, so the tally stays consistent.
@@ -396,6 +453,9 @@ export function resetForRematch(room: Room): void {
     p.eliminatedRound = undefined;
     p.role = undefined;
     p.isReady = false;
+    if (p.disconnectTimer) clearTimeout(p.disconnectTimer);
+    p.disconnectTimer = undefined;
+    p.disconnected = false;
     // KEEP p.score — points carry across matches ("Continue").
   }
   // KEEP: players, usedWords (no-repeat across the session), settings, hostId, scores.
@@ -465,6 +525,7 @@ export function toSummary(room: Room): RoomSummary {
     isEliminated: p.eliminated,
     score: p.score,
     colorIndex: p.colorIndex,
+    isConnected: !p.disconnected,
   }));
   const isOver = room.phase === "game-over";
   return {

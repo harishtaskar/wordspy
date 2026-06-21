@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { useSoundController } from "@/hooks/useSoundController";
 import { useRoleStore } from "@/store/role";
+import { useRoomStore } from "@/store/room";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { BackgroundDecor, type DecorTone } from "./BackgroundDecor";
 import { InfoMenu } from "./InfoMenu";
@@ -24,7 +25,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   useSocket();
   useSoundController();
   const role = useRoleStore((s) => s.role);
+  const phase = useRoomStore((s) => s.room?.phase);
   const tone: DecorTone = role?.role === "imposter" ? "imposter" : role?.role === "crew" ? "crew" : "neutral";
+  // Discussion gets a roster column on big screens, so let it use a wider frame.
+  const wide = phase === "discussion";
 
   return (
     <main
@@ -32,7 +36,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       style={{ background: TONE_BG[tone] }}
     >
       <BackgroundDecor tone={tone} />
-      <div className="relative z-10 flex w-full max-w-[420px] flex-col gap-4">
+      <div
+        className={[
+          "relative z-10 flex w-full flex-col gap-4 transition-[max-width] duration-300",
+          wide ? "max-w-[420px] lg:max-w-[760px]" : "max-w-[420px]",
+        ].join(" ")}
+      >
         <header className="flex flex-col items-center gap-2">
           <h1
             className="text-[44px] lowercase leading-none"

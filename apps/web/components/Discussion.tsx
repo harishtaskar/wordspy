@@ -47,63 +47,96 @@ export function Discussion({ room }: { room: RoomSummary }) {
         <span className="text-[10px] font-bold uppercase tracking-[1.5px] text-muted">discussion</span>
       </div>
 
-      <div
-        ref={feedRef}
-        aria-label="Discussion chat"
-        className="flex h-[44vh] min-h-[300px] flex-col overflow-y-auto border-[3px] border-ink bg-bg"
-      >
-        {messages.length === 0 && (
-          <p className="m-auto text-[12px] text-muted">Drop a clue…</p>
-        )}
-        {messages.map((m, i) => {
-          const mine = m.playerId === myId;
-          const colorIndex = room.players.find((p) => p.id === m.playerId)?.colorIndex;
-          return (
-            <div
-              key={`${m.ts}-${i}`}
-              className="flex w-full items-center gap-2 border-b-2 border-ink px-3 py-2 last:border-b-0"
-              style={{ background: mine ? "#FFF3C4" : avatarTint(m.playerId, colorIndex) }}
-            >
-              <Avatar id={m.playerId} name={m.username} size={28} colorIndex={colorIndex} />
-              <div className="min-w-0 flex-1 gap-0">
-                <span className="text-[12px] font-bold tracking-[1px] text-muted">
-                  {mine ? `${m.username} (You)` : m.username}
-                </span>
-                <p className="break-words text-[14px] font-medium leading-snug">{m.text}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {eliminated ? (
-        <p
-          role="status"
-          className="border-[3px] border-ink bg-imposter px-3 py-2 text-center text-[12px] font-extrabold uppercase text-white"
-        >
-          Spectating — you&apos;re out
-        </p>
-      ) : (
-        <div className="flex items-center gap-2 border-[3px] border-ink bg-surface px-3 py-2">
-          <input
-            aria-label="Message"
-            value={draft}
-            maxLength={CHAT_MAX_LENGTH}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send()}
-            placeholder="Drop a clue…"
-            className="flex-1 bg-transparent font-bold text-ink focus:outline-none"
-          />
-          <button
-            type="button"
-            aria-label="Send"
-            onClick={send}
-            className="text-[20px] font-extrabold text-crew focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink"
+      <div className="lg:grid lg:grid-cols-[1fr_220px] lg:items-stretch lg:gap-3">
+        <div className="flex flex-col gap-3">
+          <div
+            ref={feedRef}
+            aria-label="Discussion chat"
+            className="flex h-[44vh] min-h-[300px] flex-col overflow-y-auto border-[3px] border-ink bg-bg lg:h-[52vh]"
           >
-            ▸
-          </button>
+            {messages.length === 0 && (
+              <p className="m-auto text-[12px] text-muted">Drop a clue…</p>
+            )}
+            {messages.map((m, i) => {
+              const mine = m.playerId === myId;
+              const colorIndex = room.players.find((p) => p.id === m.playerId)?.colorIndex;
+              return (
+                <div
+                  key={`${m.ts}-${i}`}
+                  className="flex w-full items-center gap-2 border-b-2 border-ink px-3 py-2 last:border-b-0"
+                  style={{ background: mine ? "#FFF3C4" : avatarTint(m.playerId, colorIndex) }}
+                >
+                  <Avatar id={m.playerId} name={m.username} size={28} colorIndex={colorIndex} />
+                  <div className="min-w-0 flex-1 gap-0">
+                    <span className="text-[12px] font-bold tracking-[1px] text-muted">
+                      {mine ? `${m.username} (You)` : m.username}
+                    </span>
+                    <p className="break-words text-[14px] font-medium leading-snug">{m.text}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {eliminated ? (
+            <p
+              role="status"
+              className="border-[3px] border-ink bg-imposter px-3 py-2 text-center text-[12px] font-extrabold uppercase text-white"
+            >
+              Spectating — you&apos;re out
+            </p>
+          ) : (
+            <div className="flex items-stretch gap-2 border-[3px] border-ink bg-surface p-2">
+              <input
+                aria-label="Message"
+                value={draft}
+                maxLength={CHAT_MAX_LENGTH}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && send()}
+                placeholder="Drop a clue…"
+                className="min-h-[44px] flex-1 bg-transparent px-2 font-bold text-ink focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={send}
+                disabled={!draft.trim()}
+                className="flex min-h-[44px] items-center gap-1 border-[3px] border-ink bg-crew px-4 text-[14px] font-extrabold uppercase text-white shadow-[var(--shadow-button)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink"
+              >
+                Send <span aria-hidden>▸</span>
+              </button>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Roster — visible only when there's room for a side column. */}
+        <aside
+          aria-label="Players"
+          className="hidden lg:flex lg:flex-col lg:gap-2 lg:border-[3px] lg:border-ink lg:bg-surface lg:p-3"
+        >
+          <span className="text-[10px] font-bold uppercase tracking-[1.5px] text-muted">
+            Players · {room.players.length}
+          </span>
+          <ul className="flex flex-col gap-2">
+            {room.players.map((p) => (
+              <li key={p.id} className="flex items-center gap-2">
+                <Avatar id={p.id} name={p.username} size={24} colorIndex={p.colorIndex} />
+                <span
+                  className={[
+                    "min-w-0 flex-1 truncate text-[13px] font-bold",
+                    p.isEliminated ? "text-muted line-through" : "text-ink",
+                  ].join(" ")}
+                >
+                  {p.username}
+                  {p.id === myId ? " (You)" : ""}
+                </span>
+                {p.isConnected === false && (
+                  <span className="text-[9px] font-bold text-muted">⟳</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </aside>
+      </div>
     </section>
   );
 }

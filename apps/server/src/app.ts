@@ -251,10 +251,15 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
     SocketData
   >(httpServer, {
     cors: { origin: corsOrigin },
-    // Tightened transport heartbeat so a silent drop is detected in ~2-4s
-    // (AC#4 "~1s of a drop"), complementing the client's explicit heartbeat.
-    pingInterval: 2_000,
-    pingTimeout: 2_000,
+    // Transport keepalive. These MUST be generous: engine.io ping/pong runs in
+    // JS over the data channel, so a tight window false-positives on anything
+    // that stalls the tab for a moment — mobile backgrounding, radio sleep,
+    // proxy jitter, a GC pause — and the player gets dropped mid-game. Fast
+    // *detection* of a real drop is handled by the client's app-level heartbeat
+    // (useSocket.ts), which flips the UI to "reconnecting" without killing the
+    // socket; the reconnect grace + room:resume then recover the seat.
+    pingInterval: 25_000,
+    pingTimeout: 20_000,
   });
 
   io.on("connection", (socket) => {

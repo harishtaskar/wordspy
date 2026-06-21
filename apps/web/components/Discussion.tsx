@@ -9,11 +9,15 @@ import { playSfx } from "@/lib/sound";
 import { useChatStore } from "@/store/chat";
 import { useConnectionStore } from "@/store/connection";
 
+/** Quick-pick emojis for chat (no external picker dependency). */
+const EMOJIS = ["😀", "😂", "😉", "😎", "🤔", "😮", "😏", "🙄", "😤", "👀", "👍", "👎", "🔥", "🎯", "❓", "❗"];
+
 /** Discussion phase: round, category, server timer, roster, and live chat. */
 export function Discussion({ room }: { room: RoomSummary }) {
   const messages = useChatStore((s) => s.messages);
   const myId = useConnectionStore((s) => s.socketId);
   const [draft, setDraft] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const eliminated = room.players.find((p) => p.id === myId)?.isEliminated ?? false;
 
   // Auto-scroll the chat panel to the newest message.
@@ -23,12 +27,31 @@ export function Discussion({ room }: { room: RoomSummary }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
+  // Close the emoji popover on outside click / Escape.
+  const emojiRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!emojiOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) setEmojiOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setEmojiOpen(false);
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [emojiOpen]);
+
+  const addEmoji = (e: string) => setDraft((d) => (d + e).slice(0, CHAT_MAX_LENGTH));
+
   const send = () => {
     const text = draft.trim();
     if (!text) return;
     getSocket().emit("chat:send", { code: room.code, text });
     playSfx("pop");
     setDraft("");
+    setEmojiOpen(false);
   };
 
   return (
@@ -96,6 +119,38 @@ export function Discussion({ room }: { room: RoomSummary }) {
                 placeholder="Drop a clue…"
                 className="min-h-[44px] flex-1 bg-transparent px-2 font-bold text-ink focus:outline-none"
               />
+
+              <div ref={emojiRef} className="relative shrink-0">
+                {emojiOpen && (
+                  <div
+                    role="menu"
+                    aria-label="Emoji picker"
+                    className="absolute bottom-[52px] right-0 grid w-[224px] grid-cols-8 gap-1 border-[3px] border-ink bg-surface p-2 shadow-[var(--shadow-card)]"
+                  >
+                    {EMOJIS.map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        aria-label={`Add ${e}`}
+                        onClick={() => addEmoji(e)}
+                        className="flex h-7 w-7 items-center justify-center text-[18px] hover:bg-accent focus-visible:bg-accent focus:outline-none"
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  aria-label="Emoji"
+                  aria-expanded={emojiOpen}
+                  onClick={() => setEmojiOpen((v) => !v)}
+                  className="flex h-11 w-11 items-center justify-center border-[3px] border-ink bg-surface text-[20px] shadow-[var(--shadow-button)] transition active:translate-x-[2px] active:translate-y-[2px] active:shadow-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink"
+                >
+                  😊
+                </button>
+              </div>
+
               <button
                 type="button"
                 aria-label="Send"

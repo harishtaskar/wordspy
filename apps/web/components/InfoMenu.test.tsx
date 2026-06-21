@@ -1,10 +1,22 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { InfoMenu } from "./InfoMenu";
+import { useRoomStore } from "@/store/room";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useRoomStore.getState().clearRoom();
+});
 
 describe("InfoMenu", () => {
+  it("hides Report once the game is in progress", () => {
+    useRoomStore.getState().setRoom({ code: "ABCDE", phase: "discussion" } as never);
+    render(<InfoMenu />);
+    fireEvent.click(screen.getByRole("button", { name: /info menu/i }));
+    expect(screen.queryByRole("menuitem", { name: /report an issue/i })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: /github/i })).toBeTruthy();
+  });
+
   it("opens the menu with Report + GitHub options", () => {
     render(<InfoMenu />);
     expect(screen.queryByRole("menu")).toBeNull();

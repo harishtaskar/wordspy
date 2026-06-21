@@ -48,7 +48,11 @@ describe("PublicRooms", () => {
   it("joins a room from the list → emits room:join and enters the room", async () => {
     render(<PublicRooms />);
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
-    expect(emit).toHaveBeenCalledWith("room:join", { code: "ABCDE", username: "Mo" }, expect.any(Function));
+    expect(emit).toHaveBeenCalledWith(
+      "room:join",
+      expect.objectContaining({ code: "ABCDE", username: "Mo", sessionId: expect.any(String) }),
+      expect.any(Function),
+    );
     await waitFor(() => expect(screen.getByText("ABCDE")).toBeTruthy());
   });
 

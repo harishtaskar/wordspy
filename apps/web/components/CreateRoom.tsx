@@ -58,6 +58,7 @@ function OptionRow<T extends string | number>({
 export function CreateRoom() {
   const router = useRouter();
   const username = usePlayerSession((s) => s.username);
+  const ensureSession = usePlayerSession((s) => s.ensureSession);
   const room = useRoomStore((s) => s.room);
   const setRoom = useRoomStore((s) => s.setRoom);
 
@@ -70,6 +71,11 @@ export function CreateRoom() {
     if (!validateUsername(username).ok) router.replace("/");
   }, [username, router]);
 
+  // Make sure a stable session id exists before we can hold a reconnectable seat.
+  useEffect(() => {
+    ensureSession();
+  }, [ensureSession]);
+
   if (room) return <RoomView room={room} />;
 
   const patch = (p: Partial<RoomSettings>) => setSettings((s) => ({ ...s, ...p }));
@@ -77,9 +83,11 @@ export function CreateRoom() {
   const submit = () => {
     setError(null);
     setPending(true);
+    ensureSession();
+    const sessionId = usePlayerSession.getState().sessionId ?? "";
     getSocket().emit(
       "room:create",
-      { username, settings },
+      { username, settings, sessionId },
       (res: AckResponse<RoomSummary>) => {
         setPending(false);
         if (res.ok) setRoom(res.data);

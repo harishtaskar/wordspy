@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import type { AddressInfo } from "node:net";
 import { io as ioClient, type Socket } from "socket.io-client";
 import { createApp, type AppHandles } from "./app.js";
@@ -507,7 +507,12 @@ describe("vote:cast", () => {
 describe("imposter disconnect insta-win (4.3)", () => {
   let c2: Socket<ServerToClientEvents, ClientToServerEvents> | undefined;
   let c3: Socket<ServerToClientEvents, ClientToServerEvents> | undefined;
+  // Shrink the reconnect grace so the deferred crew-win lands within the test budget.
+  beforeEach(() => {
+    process.env.RECONNECT_GRACE_MS = "150";
+  });
   afterEach(() => {
+    delete process.env.RECONNECT_GRACE_MS;
     c2?.close();
     c3?.close();
     c2 = c3 = undefined;
@@ -547,6 +552,56 @@ describe("imposter disconnect insta-win (4.3)", () => {
     expect(rs.phase).toBe("game-over");
     expect(rs.winner).toBe("crew");
     expect(rs.winReason).toBe("imposter-left");
+  });
+
+  it("lets a dropped player reclaim their seat and score via room:resume", async () => {
+    process.env.RECONNECT_GRACE_MS = "5000"; // ample window to reconnect within the test
+    const port = await listen();
+    // Join with a stable sessionId so the seat can be reclaimed after a drop.
+    client = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => client!.on("connect", () => r()));
+    const created = await new Promise<AckResponse<RoomSummary>>((r) =>
+      client!.emit("room:create", { username: "Aanya", settings: DEFAULT_ROOM_SETTINGS, sessionId: "s-host" }, r),
+    );
+    if (!created.ok) throw new Error("create");
+    const code = created.data.code;
+    c2 = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => c2!.on("connect", () => r()));
+    const j2 = await new Promise<AckResponse<RoomSummary>>((r) =>
+      c2!.emit("room:join", { code, username: "Rex", sessionId: "s-rex" }, r),
+    );
+    c3 = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => c3!.on("connect", () => r()));
+    await new Promise<AckResponse<RoomSummary>>((r) =>
+      c3!.emit("room:join", { code, username: "Mo", sessionId: "s-mo" }, r),
+    );
+    if (!j2.ok) throw new Error("join");
+    const rexId = j2.data.players.find((p) => p.username === "Rex")!.id;
+
+    const room = getRoom(code)!;
+    room.phase = "discussion";
+    room.imposterId = client!.id ?? ""; // host is imposter; Rex (crew) can safely drop
+    room.players.get(rexId)!.score = 7; // points that must survive the reconnect
+
+    // Rex drops, then a brand-new socket reclaims the seat with the same sessionId.
+    c2!.close();
+    await new Promise((r) => setTimeout(r, 50)); // let the server register the drop
+    const c2b = ioClient(`http://localhost:${port}`, { transports: ["websocket"] });
+    await new Promise<void>((r) => c2b.on("connect", () => r()));
+    const resumed = await new Promise<AckResponse<RoomSummary>>((r) =>
+      c2b.emit("room:resume", { code, sessionId: "s-rex" }, r),
+    );
+
+    expect(resumed.ok).toBe(true);
+    if (resumed.ok) {
+      const rex = resumed.data.players.find((p) => p.username === "Rex");
+      expect(rex).toBeTruthy();
+      expect(rex!.score).toBe(7); // score preserved
+      expect(rex!.isConnected).toBe(true);
+      expect(rex!.id).toBe(c2b.id); // re-keyed onto the new socket
+      expect(resumed.data.phase).toBe("discussion"); // still mid-match
+    }
+    c2b.close();
   });
 
   it("does NOT end the match when a non-imposter disconnects", async () => {
@@ -597,15 +652,18 @@ describe("review fixes — voting deadlock + multi-room (2026-06-17)", () => {
 
     const room = getRoom(code)!;
     room.phase = "voting";
-    room.imposterId = rexId;
+    room.imposterId = client!.id ?? ""; // host is imposter; Rex/Mo are crew
+    void moId;
 
-    // host + Mo vote; Rex never votes, then disconnects → round must still resolve.
+    // host + Mo validly vote for Rex; Rex never votes, then disconnects. A dropped
+    // player no longer counts toward quorum, so the round resolves without deadlock.
     const resolved = new Promise<RoomSummary>((resolve) =>
       c3!.on("room:state", (rm) => (rm.phase === "result" || rm.phase === "game-over") && resolve(rm)),
     );
-    client!.emit("vote:cast", { code, targetId: moId });
-    c3!.emit("vote:cast", { code, targetId: moId });
-    // Now active = {host, Rex, Mo} = 3, votes = 2. Rex leaves → active 2, votes 2 → resolves.
+    client!.emit("vote:cast", { code, targetId: rexId });
+    c3!.emit("vote:cast", { code, targetId: rexId });
+    // active = {host, Rex, Mo} = 3, votes = 2. Rex drops → eligible 2, votes 2 → resolves.
+    await new Promise((r) => setTimeout(r, 50)); // ensure both votes land before the drop
     c2!.close();
 
     const rs = await resolved;

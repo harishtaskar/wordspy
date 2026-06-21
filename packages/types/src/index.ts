@@ -137,6 +137,8 @@ export interface PlayerSummary {
   score: number;
   /** Stable avatar palette index (distinct per player). */
   colorIndex: number;
+  /** False while the player is mid-disconnect (within the reconnect grace window). Absent ⇒ connected. */
+  isConnected?: boolean;
 }
 
 /** Wire-safe view of a room broadcast to its members. */
@@ -169,6 +171,14 @@ export interface RoomSummary {
 export interface CreateRoomRequest {
   username: string;
   settings: RoomSettings;
+  /** Stable per-browser id so a dropped player can reclaim their seat on reconnect. */
+  sessionId?: string;
+}
+
+/** Reclaim an existing seat after a network drop (same room, same sessionId). */
+export interface ResumeRequest {
+  code: string;
+  sessionId: string;
 }
 
 /** Lightweight public-room listing for the browse screen. */
@@ -183,6 +193,8 @@ export interface PublicRoomInfo {
 export interface JoinRoomRequest {
   code: string;
   username: string;
+  /** Stable per-browser id so a dropped player can reclaim their seat on reconnect. */
+  sessionId?: string;
 }
 
 export interface SetReadyRequest {
@@ -255,6 +267,11 @@ export interface ClientToServerEvents {
   /** Join an existing room by code. Ack with the room summary or an error. */
   "room:join": (
     req: JoinRoomRequest,
+    ack: (res: AckResponse<RoomSummary>) => void,
+  ) => void;
+  /** Reclaim a seat after a transient disconnect; ack with the current room state. */
+  "room:resume": (
+    req: ResumeRequest,
     ack: (res: AckResponse<RoomSummary>) => void,
   ) => void;
   /** Toggle the caller's ready state in a room. */

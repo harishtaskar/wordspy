@@ -29,6 +29,8 @@ import {
   setWinner,
   activePlayers,
   findRoomsForSocket,
+  findPlayerBySession,
+  rebindPlayer,
   getRoom,
   toSummary,
   type Room,
@@ -50,6 +52,13 @@ const RESULT_REVEAL_MS = 5000;
 const FINAL_GUESS_MS = 20000;
 /** Hard voting deadline — guarantees a round resolves even if someone never votes. */
 const VOTE_MS = 30000;
+/** Grace window after a drop in which a player can reconnect and reclaim their seat. */
+const DEFAULT_RECONNECT_GRACE_MS = 45000;
+/** Overridable (mainly for tests) so a dropped seat isn't held for the full window. */
+function reconnectGraceMs(): number {
+  const v = Number(process.env.RECONNECT_GRACE_MS);
+  return Number.isFinite(v) && v > 0 ? v : DEFAULT_RECONNECT_GRACE_MS;
+}
 /** Socket.IO room that public-room browsers subscribe to for live updates. */
 const BROWSE = "browse";
 
@@ -107,8 +116,10 @@ function startVotingTimer(room: Room, io: GameIOServer): void {
 /** Resolve the round once every active player has voted (or call directly to force it). */
 function maybeResolveVoting(room: Room, io: GameIOServer): void {
   if (room.phase !== "voting") return;
-  const active = activePlayers(room).length;
-  if (active > 0 && room.votes.size >= active) {
+  // Only players still connected can vote; don't block the round on a dropped one
+  // (the hard VOTE_MS deadline still covers anyone who simply never votes).
+  const eligible = activePlayers(room).filter((p) => !p.disconnected).length;
+  if (eligible > 0 && room.votes.size >= eligible) {
     resolveVotingRound(room, io);
   }
 }
@@ -161,6 +172,34 @@ function startFinalGuess(room: Room, io: GameIOServer): void {
     io.to(current.code).emit("room:state", toSummary(current));
   }, FINAL_GUESS_MS);
   room.timer.unref?.();
+}
+
+/**
+ * Finalize a player's departure once the reconnect grace window has elapsed with
+ * no resume. Mirrors the immediate-disconnect rules: an Imposter who never comes
+ * back hands Crew the win (FR24); anyone else is just removed and survivors are
+ * notified (a departing voter may unblock the round).
+ */
+function finalizeDeparture(code: string, lostId: string, io: GameIOServer): void {
+  const room = getRoom(code);
+  if (!room) return;
+  const inProgress = room.phase !== "lobby" && room.phase !== "game-over";
+  if (inProgress && room.imposterId === lostId) {
+    if (room.timer) clearTimeout(room.timer);
+    room.winReason = "imposter-left";
+    setWinner(room, "crew");
+    removePlayer(code, lostId);
+    const after = getRoom(code);
+    if (after) io.to(code).emit("room:state", toSummary(after));
+    console.log(`[room] ${code} imposter never reconnected → Crew win`);
+  } else {
+    const result = removePlayer(code, lostId);
+    if (!result.deleted && result.room) {
+      maybeResolveVoting(result.room, io);
+      io.to(code).emit("room:state", toSummary(result.room));
+    }
+  }
+  broadcastPublicRooms(io);
 }
 
 export type GameIOServer = IOServer<
@@ -253,7 +292,11 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
         return;
       }
       try {
-        const room = createRoom({ id: socket.id, username: result.username }, result.settings);
+        const sessionId = typeof req?.sessionId === "string" ? req.sessionId : "";
+        const room = createRoom(
+          { id: socket.id, username: result.username, sessionId },
+          result.settings,
+        );
         socket.join(room.code);
         const summary = toSummary(room);
         if (typeof ack === "function") ack({ ok: true, data: summary });
@@ -278,7 +321,8 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
         if (typeof ack === "function") ack({ ok: false, error: "You're already in a room." });
         return;
       }
-      const result = addPlayer(valid.code, { id: socket.id, username: valid.username });
+      const sessionId = typeof req?.sessionId === "string" ? req.sessionId : "";
+      const result = addPlayer(valid.code, { id: socket.id, username: valid.username, sessionId });
       if (!result.ok) {
         if (typeof ack === "function") ack({ ok: false, error: result.error });
         return;
@@ -290,6 +334,49 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       io.to(valid.code).emit("room:state", summary);
       broadcastPublicRooms(io);
       console.log(`[room] ${socket.id} joined ${valid.code}`);
+    });
+
+    // Reconnect: a player who dropped mid-match reclaims their seat (and score)
+    // by presenting the same stable sessionId before the grace window expires.
+    socket.on("room:resume", (req, ack) => {
+      const code = typeof req?.code === "string" ? req.code.trim().toUpperCase() : "";
+      const sessionId = typeof req?.sessionId === "string" ? req.sessionId : "";
+      const room = getRoom(code);
+      if (!room || !sessionId) {
+        if (typeof ack === "function") ack({ ok: false, error: "Room no longer exists." });
+        return;
+      }
+      const player = findPlayerBySession(room, sessionId);
+      if (!player) {
+        if (typeof ack === "function") ack({ ok: false, error: "Your seat is gone." });
+        return;
+      }
+      // Cancel the pending departure and re-key the seat onto the new socket.
+      if (player.disconnectTimer) clearTimeout(player.disconnectTimer);
+      player.disconnectTimer = undefined;
+      player.disconnected = false;
+      const oldId = player.id;
+      rebindPlayer(room, oldId, socket.id);
+      socket.join(code);
+
+      const summary = toSummary(room);
+      if (typeof ack === "function") ack({ ok: true, data: summary });
+
+      // Re-deliver the secret role so the reconnected client can render the game.
+      const mid = room.phase !== "lobby" && room.phase !== "game-over";
+      if (mid && player.role) {
+        if (player.role === "imposter") {
+          const payload: ImposterRolePayload = { role: "imposter", category: room.settings.category };
+          socket.emit("game:role", payload);
+        } else if (room.secretWord) {
+          const payload: CrewRolePayload = { role: "crew", word: room.secretWord, category: room.settings.category };
+          socket.emit("game:role", payload);
+        }
+      }
+
+      io.to(code).emit("room:state", summary);
+      broadcastPublicRooms(io);
+      console.log(`[room] ${socket.id} resumed seat in ${code} (was ${oldId})`);
     });
 
     socket.on("room:setReady", (req, ack) => {
@@ -490,23 +577,36 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
 
     socket.on("disconnect", (reason) => {
       console.log(`[socket] disconnected ${socket.id} (${reason})`);
-      for (const code of findRoomsForSocket(socket.id)) {
+      const lostId = socket.id;
+      for (const code of findRoomsForSocket(lostId)) {
         const room = getRoom(code);
-        const inProgress =
-          room && room.phase !== "lobby" && room.phase !== "game-over";
-        if (room && inProgress && room.imposterId === socket.id) {
-          // Imposter quit mid-match → instant Crew win (FR24).
-          if (room.timer) clearTimeout(room.timer);
-          room.winReason = "imposter-left";
-          setWinner(room, "crew");
-          removePlayer(code, socket.id); // drop the imposter from the roster
-          const after = getRoom(code);
-          if (after) io.to(code).emit("room:state", toSummary(after));
-          console.log(`[room] ${code} imposter left mid-match → Crew win`);
-        } else {
-          // Normal removal: migrate host / delete empties; notify survivors.
+        if (!room) continue;
+        const inProgress = room.phase !== "lobby" && room.phase !== "game-over";
+        const player = room.players.get(lostId);
+        if (!inProgress || !player) {
+          // Lobby / game-over (or unknown player): nothing to preserve — remove now.
           leaveRoom(code);
+          continue;
         }
+        // Mid-match drop: hold the seat (and score) for a grace window so a quick
+        // reconnect via room:resume can continue play. Only finalize if it lapses.
+        const graceMs = reconnectGraceMs();
+        player.disconnected = true;
+        if (player.disconnectTimer) clearTimeout(player.disconnectTimer);
+        player.disconnectTimer = setTimeout(() => {
+          const current = getRoom(code);
+          const stillGone = current?.players.get(lostId);
+          // If they resumed, the seat was re-keyed off lostId → nothing here to do.
+          if (!stillGone || !stillGone.disconnected) return;
+          finalizeDeparture(code, lostId, io);
+        }, graceMs);
+        player.disconnectTimer.unref?.();
+        // A dropped player no longer counts toward the voting quorum, so their
+        // exit may complete the round even before the grace window elapses.
+        maybeResolveVoting(room, io);
+        // Let the room see them greyed out as "reconnecting".
+        io.to(code).emit("room:state", toSummary(room));
+        console.log(`[room] ${lostId} dropped from ${code}; holding seat ${graceMs}ms`);
       }
     });
   });

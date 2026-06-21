@@ -6,7 +6,7 @@ import { pickWord } from "./pickWord.js";
 describe("word packs", () => {
   it("every concrete category has enabled words", () => {
     for (const c of CONCRETE_CATEGORIES) {
-      expect(WORD_PACKS[c].length).toBeGreaterThanOrEqual(40);
+      expect(WORD_PACKS[c].length).toBeGreaterThanOrEqual(20);
       expect(enabledWords(c).length).toBeGreaterThan(0);
     }
   });

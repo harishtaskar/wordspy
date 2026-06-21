@@ -16,13 +16,15 @@ export type Sfx =
 
 type Note = [freq: number, dur: number]; // dur in beats
 
+// Calm, slow C-major-pentatonic loop — gentle rises and falls, lots of held
+// notes and rests so it sits softly in the background rather than driving.
 const MELODY: Note[] = [
-  [392, 1], [523, 1], [659, 1], [523, 1],
-  [440, 1], [587, 1], [523, 2],
-  [349, 1], [440, 1], [523, 1], [440, 1],
-  [392, 1], [330, 1], [392, 2],
+  [262, 2], [330, 2], [392, 2], [330, 2], // C  E  G  E
+  [294, 2], [392, 1], [440, 3],           // D  G  A (held)
+  [392, 2], [330, 2], [294, 2], [262, 2], // G  E  D  C
+  [196, 3], [262, 2], [220, 3],           // G(low) C  A(low), settle
 ];
-const BEAT = 0.34; // seconds per beat
+const BEAT = 0.6; // seconds per beat — slower, relaxed tempo
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
@@ -45,7 +47,7 @@ class SoundEngine {
       this.master.gain.value = 0.5;
       this.master.connect(this.ctx.destination);
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = 0.12;
+      this.musicGain.gain.value = 0.07;
       this.musicGain.connect(this.master);
     }
     return this.ctx;
@@ -140,11 +142,12 @@ class SoundEngine {
     const t0 = ctx.currentTime + 0.02;
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
-    osc.type = "triangle";
+    // Soft sine with a slow swell and long fade — no percussive attack.
+    osc.type = "sine";
     osc.frequency.setValueAtTime(freq, t0);
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(1, t0 + 0.04);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.9);
+    g.gain.exponentialRampToValueAtTime(0.6, t0 + dur * 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.98);
     osc.connect(g);
     g.connect(this.musicGain);
     osc.start(t0);

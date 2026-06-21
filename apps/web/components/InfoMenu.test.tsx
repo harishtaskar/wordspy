@@ -9,12 +9,10 @@ afterEach(() => {
 });
 
 describe("InfoMenu", () => {
-  it("hides Report once the game is in progress", () => {
+  it("hides the whole info button once the game is in progress", () => {
     useRoomStore.getState().setRoom({ code: "ABCDE", phase: "discussion" } as never);
     render(<InfoMenu />);
-    fireEvent.click(screen.getByRole("button", { name: /info menu/i }));
-    expect(screen.queryByRole("menuitem", { name: /report an issue/i })).toBeNull();
-    expect(screen.getByRole("menuitem", { name: /github/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /info menu/i })).toBeNull();
   });
 
   it("opens the menu with Report + GitHub options", () => {

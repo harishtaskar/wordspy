@@ -98,11 +98,14 @@ export function Discussion({ room }: { room: RoomSummary }) {
               />
               <button
                 type="button"
+                aria-label="Send"
                 onClick={send}
                 disabled={!draft.trim()}
-                className="flex min-h-[44px] items-center gap-1 border-[3px] border-ink bg-crew px-4 text-[14px] font-extrabold uppercase text-white shadow-[var(--shadow-button)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink"
+                className="flex h-11 w-11 shrink-0 items-center justify-center border-[3px] border-ink bg-crew/80 text-white backdrop-blur-sm shadow-[var(--shadow-button)] transition active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink"
               >
-                Send <span aria-hidden>▸</span>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden>
+                  <path d="M3 11.5 21 3l-8.5 18-2.2-7.3L3 11.5Z" />
+                </svg>
               </button>
             </div>
           )}

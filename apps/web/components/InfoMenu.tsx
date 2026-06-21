@@ -6,7 +6,7 @@ import { useRoomStore } from "@/store/room";
 
 const GITHUB_URL = "https://github.com/harishtaskar";
 
-/** Phases where a match is actively underway (report hidden to avoid mid-game taps). */
+/** Phases where a match is actively underway (info button hidden to avoid mid-game taps). */
 const IN_GAME_PHASES = new Set(["role-reveal", "discussion", "voting", "result", "final-guess"]);
 
 /** Bottom-left info button → menu (Report an issue · GitHub). */
@@ -14,9 +14,9 @@ export function InfoMenu() {
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  // Hide "Report an issue" once the game has started (lobby / game-over keep it).
+  // Hide the whole info button once the game has started (lobby / game-over keep it).
   const phase = useRoomStore((s) => s.room?.phase);
-  const canReport = !phase || !IN_GAME_PHASES.has(phase);
+  const inGame = !!phase && IN_GAME_PHASES.has(phase);
 
   // Close the menu on outside click / Escape.
   useEffect(() => {
@@ -33,6 +33,9 @@ export function InfoMenu() {
     };
   }, [open]);
 
+  // Game underway → hide the whole info affordance (no menu, no button).
+  if (inGame) return null;
+
   return (
     <>
       <div ref={wrapRef} className="fixed bottom-4 left-4 z-40">
@@ -41,19 +44,17 @@ export function InfoMenu() {
             role="menu"
             className="absolute bottom-[52px] left-0 flex w-[200px] flex-col border-[3px] border-ink bg-surface shadow-[var(--shadow-card)]"
           >
-            {canReport && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  setReporting(true);
-                }}
-                className="border-b-2 border-ink px-3 py-2 text-left text-[13px] font-bold hover:bg-accent focus-visible:bg-accent focus:outline-none"
-              >
-                🐞 Report an issue
-              </button>
-            )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                setReporting(true);
+              }}
+              className="border-b-2 border-ink px-3 py-2 text-left text-[13px] font-bold hover:bg-accent focus-visible:bg-accent focus:outline-none"
+            >
+              🐞 Report an issue
+            </button>
             <a
               role="menuitem"
               href={GITHUB_URL}

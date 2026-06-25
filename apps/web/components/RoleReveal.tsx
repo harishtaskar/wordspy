@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { RolePayload } from "@wordspy/types";
+import { CATEGORY_LABELS, type RolePayload } from "@wordspy/types";
 import { Button } from "./Button";
 import { playSfx } from "@/lib/sound";
 
@@ -54,7 +54,7 @@ export function RoleReveal({ role, onDone }: { role: RolePayload; onDone: () => 
       {isImposter ? (
         <>
           <span className="inline-block border-2 border-ink bg-accent px-2 py-[3px] text-[10px] font-extrabold uppercase">
-            Category: {role.category}
+            Category: {CATEGORY_LABELS[role.category]}
           </span>
           <p className="text-[13px] font-bold">No word for you. Blend in, find the word, survive.</p>
         </>

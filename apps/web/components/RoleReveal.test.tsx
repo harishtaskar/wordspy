@@ -5,8 +5,8 @@ import { RoleReveal } from "./RoleReveal";
 
 afterEach(cleanup);
 
-const crew: RolePayload = { role: "crew", word: "PIZZA", category: "food" };
-const imposter: RolePayload = { role: "imposter", category: "food" };
+const crew: RolePayload = { role: "crew", word: "PIZZA", category: "world-food" };
+const imposter: RolePayload = { role: "imposter", category: "world-food" };
 
 describe("RoleReveal", () => {
   it("shows the word and a CREW label for crew", () => {
@@ -19,7 +19,7 @@ describe("RoleReveal", () => {
     render(<RoleReveal role={imposter} onDone={() => {}} />);
     expect(screen.getByText("IMPOSTER")).toBeTruthy();
     expect(screen.getByText(/you are the imposter/i)).toBeTruthy();
-    expect(screen.getByText(/category: food/i)).toBeTruthy();
+    expect(screen.getByText(/category: world food/i)).toBeTruthy();
     // No word anywhere in the imposter reveal.
     expect(screen.queryByText("PIZZA")).toBeNull();
   });

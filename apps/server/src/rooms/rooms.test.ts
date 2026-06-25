@@ -141,9 +141,21 @@ describe("addPlayer", () => {
     addPlayer(room.code, { id: "p4", username: "Mo" });
     addPlayer(room.code, { id: "p5", username: "Sam" });
     expect(addPlayer(room.code, { id: "p6", username: "Lee" })).toMatchObject({ ok: false, error: "Room full." });
+  });
 
-    // started room
-    room.phase = "lobby"; // (only lobby exists now; guard still covered by registry logic)
+  it("mid-match join becomes a spectator (pending) when a seat is free", () => {
+    const room = createRoom({ id: "host", username: "Aanya" }, { ...DEFAULT_ROOM_SETTINGS, maxPlayers: 4 });
+    addPlayer(room.code, { id: "p2", username: "Rex" });
+    room.phase = "discussion"; // match in progress
+
+    const res = addPlayer(room.code, { id: "late", username: "Late" });
+    expect(res.ok).toBe(true);
+    expect(room.players.get("late")?.pending).toBe(true);
+    expect(toSummary(room).players.find((p) => p.id === "late")?.isSpectator).toBe(true);
+
+    // still gated by capacity even mid-match
+    addPlayer(room.code, { id: "p4", username: "Mo" });
+    expect(addPlayer(room.code, { id: "p5", username: "Sam" })).toMatchObject({ ok: false, error: "Room full." });
   });
 });
 
@@ -220,11 +232,12 @@ describe("kickPlayer", () => {
 });
 
 describe("listPublicRooms", () => {
-  it("lists only public, lobby-phase, not-full rooms with the right info", () => {
+  it("lists every public room (lobby, in-progress, or full); hides private", () => {
     const pub = createRoom({ id: "h1", username: "Aanya" }, { ...DEFAULT_ROOM_SETTINGS, isPrivate: false });
     const priv = createRoom({ id: "h2", username: "Rex" }, { ...DEFAULT_ROOM_SETTINGS, isPrivate: true });
     const started = createRoom({ id: "h3", username: "Mo" }, { ...DEFAULT_ROOM_SETTINGS, isPrivate: false });
     started.phase = "discussion";
+    started.round = 2;
     const full = createRoom({ id: "h4", username: "Sam" }, { ...DEFAULT_ROOM_SETTINGS, isPrivate: false, maxPlayers: 4 });
     addPlayer(full.code, { id: "f1", username: "F1" });
     addPlayer(full.code, { id: "f2", username: "F2" });
@@ -232,13 +245,20 @@ describe("listPublicRooms", () => {
 
     const list = listPublicRooms();
     const codes = list.map((r) => r.code);
-    expect(codes).toContain(pub.code);
-    expect(codes).not.toContain(priv.code); // private
-    expect(codes).not.toContain(started.code); // not lobby
-    expect(codes).not.toContain(full.code); // full
+    expect(codes).toContain(pub.code); // lobby
+    expect(codes).toContain(started.code); // in-progress now shown
+    expect(codes).toContain(full.code); // full now shown
+    expect(codes).not.toContain(priv.code); // private stays hidden
 
     const info = list.find((r) => r.code === pub.code)!;
-    expect(info).toMatchObject({ hostName: "Aanya", players: 1, category: DEFAULT_ROOM_SETTINGS.category });
+    expect(info).toMatchObject({
+      hostName: "Aanya",
+      players: 1,
+      category: DEFAULT_ROOM_SETTINGS.category,
+      phase: "lobby",
+      round: 1,
+    });
+    expect(list.find((r) => r.code === started.code)).toMatchObject({ phase: "discussion", round: 2 });
   });
 });
 
@@ -277,9 +297,9 @@ describe("cumulative scoring + updateRoomSettings (improvements)", () => {
 
   it("host updates settings in lobby + game-over, rejected mid-match / non-host", () => {
     const room = createRoom({ id: "host", username: "Aanya" }, DEFAULT_ROOM_SETTINGS);
-    const next = { ...DEFAULT_ROOM_SETTINGS, category: "movies" as const, maxPlayers: 4 as const };
+    const next = { ...DEFAULT_ROOM_SETTINGS, category: "world-movies" as const, maxPlayers: 4 as const };
     expect(updateRoomSettings(room.code, "host", next).ok).toBe(true);
-    expect(room.settings.category).toBe("movies");
+    expect(room.settings.category).toBe("world-movies");
     room.phase = "discussion";
     expect(updateRoomSettings(room.code, "host", next)).toMatchObject({ ok: false });
     room.phase = "game-over";

@@ -26,9 +26,9 @@ const room: RoomSummary = {
   settings: DEFAULT_ROOM_SETTINGS,
   hostId: "host",
   players: [
-    { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 270, colorIndex: 0 },
-    { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, score: 0, colorIndex: 0 },
-    { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false, score: 170, colorIndex: 0 },
+    { id: "host", username: "Aanya", isHost: true, isReady: false, isEliminated: false, isSpectator: false, score: 270, colorIndex: 0 },
+    { id: "p2", username: "Rex", isHost: false, isReady: false, isEliminated: false, isSpectator: false, score: 0, colorIndex: 0 },
+    { id: "p3", username: "Mo", isHost: false, isReady: false, isEliminated: false, isSpectator: false, score: 170, colorIndex: 0 },
   ],
 };
 

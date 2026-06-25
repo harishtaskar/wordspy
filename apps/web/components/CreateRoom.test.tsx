@@ -35,7 +35,7 @@ describe("CreateRoom", () => {
       revote: false,
       settings: DEFAULT_ROOM_SETTINGS,
       hostId: "s1",
-      players: [{ id: "s1", username: "Aanya", isHost: true, isReady: false, isEliminated: false, score: 0, colorIndex: 0 }],
+      players: [{ id: "s1", username: "Aanya", isHost: true, isReady: false, isEliminated: false, isSpectator: false, score: 0, colorIndex: 0 }],
     };
     emit.mockImplementation((_event, _req, cb) => cb({ ok: true, data: room }));
 
@@ -59,7 +59,7 @@ describe("CreateRoom", () => {
 
   it("updates a setting when an option is picked", () => {
     render(<CreateRoom />);
-    const moviesBtn = screen.getByRole("button", { name: /^movies$/i });
+    const moviesBtn = screen.getByRole("button", { name: /^world movies$/i });
     fireEvent.click(moviesBtn);
     expect(moviesBtn.getAttribute("aria-pressed")).toBe("true");
   });

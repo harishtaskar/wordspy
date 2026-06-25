@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CATEGORIES,
+  CATEGORY_LABELS,
   DISCUSSION_TIMES,
   MAX_PLAYERS_OPTIONS,
   DEFAULT_ROOM_SETTINGS,
+  type Category,
   type RoomSettings,
   type AckResponse,
   type RoomSummary,
@@ -110,6 +112,7 @@ export function CreateRoom() {
         options={CATEGORIES}
         value={settings.category}
         onPick={(category) => patch({ category })}
+        fmt={(v) => CATEGORY_LABELS[v as Category]}
       />
       <OptionRow
         label="Discussion time"

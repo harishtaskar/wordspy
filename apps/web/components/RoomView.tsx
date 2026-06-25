@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { RoomSummary, RolePayload, ChatMessage } from "@wordspy/types";
 import { Button } from "./Button";
 import { getSocket } from "@/lib/socket";
+import { useConnectionStore } from "@/store/connection";
 import { useRoomStore } from "@/store/room";
 import { useRoleStore } from "@/store/role";
 import { useChatStore } from "@/store/chat";
@@ -30,6 +31,9 @@ export function RoomView({ room }: { room: RoomSummary }) {
   const clearRole = useRoleStore((s) => s.clearRole);
   const addMessage = useChatStore((s) => s.addMessage);
   const clearChat = useChatStore((s) => s.clear);
+  const myId = useConnectionStore((s) => s.socketId);
+  // A player who joined mid-match: watch-only this match, plays the next one.
+  const isSpectator = liveRoom.players.find((p) => p.id === myId)?.isSpectator ?? false;
 
   // Server-authoritative updates: roster/phase, our secret role, chat, kicks.
   useEffect(() => {
@@ -68,16 +72,49 @@ export function RoomView({ room }: { room: RoomSummary }) {
     }
   }, [liveRoom.phase, clearRole, clearChat]);
 
+  // Leave the room at any time — including mid-match (server frees the seat and
+  // resolves the round if a vote was pending).
+  const leaveGame = () => {
+    getSocket().emit("room:leave", { code: room.code });
+    clearRoom();
+    clearRole();
+    clearChat();
+    router.replace("/");
+  };
+
+  // Wrap an in-game phase with a persistent "Leave game" control.
+  const withLeave = (node: ReactNode) => (
+    <section className="flex flex-col gap-4">
+      {node}
+      <button
+        type="button"
+        onClick={leaveGame}
+        className="min-h-[44px] text-[12px] font-bold uppercase tracking-[1.5px] text-muted underline underline-offset-4 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-ink"
+      >
+        Leave game
+      </button>
+    </section>
+  );
+
   // --- Role reveal phase ---------------------------------------------------
   if (liveRoom.phase === "role-reveal") {
-    if (role && !revealDone) {
-      return (
-        <section className="flex flex-col gap-4">
-          <RoleReveal role={role} onDone={() => setRevealDone(true)} />
-        </section>
+    if (isSpectator) {
+      return withLeave(
+        <section className="border-[3px] border-ink bg-surface p-[14px] text-center shadow-[var(--shadow-card)]">
+          <p
+            className="text-[20px] uppercase leading-none tracking-tight"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Spectating
+          </p>
+          <p className="mt-2 text-[13px] text-muted">A match is in progress. You&apos;ll play next round.</p>
+        </section>,
       );
     }
-    return (
+    if (role && !revealDone) {
+      return withLeave(<RoleReveal role={role} onDone={() => setRevealDone(true)} />);
+    }
+    return withLeave(
       <section className="border-[3px] border-ink bg-surface p-[14px] text-center shadow-[var(--shadow-card)]">
         <p
           className="text-[20px] uppercase leading-none tracking-tight"
@@ -86,55 +123,43 @@ export function RoomView({ room }: { room: RoomSummary }) {
           {role ? "Get ready…" : "Assigning roles…"}
         </p>
         <p className="mt-2 text-[13px] text-muted">Discussion starting…</p>
-      </section>
+      </section>,
     );
   }
 
   // --- Discussion phase ----------------------------------------------------
   if (liveRoom.phase === "discussion") {
-    return (
-      <section className="flex flex-col gap-4">
+    return withLeave(
+      <>
         {role && <RoleBanner role={role} />}
         <Discussion room={liveRoom} />
-      </section>
+      </>,
     );
   }
 
   // --- Voting phase --------------------------------------------------------
   if (liveRoom.phase === "voting") {
-    return (
-      <section className="flex flex-col gap-4">
+    return withLeave(
+      <>
         {role && <RoleBanner role={role} />}
         <Voting room={liveRoom} />
-      </section>
+      </>,
     );
   }
 
   // --- Result phase --------------------------------------------------------
   if (liveRoom.phase === "result") {
-    return (
-      <section className="flex flex-col gap-4">
-        <VoteResultReveal room={liveRoom} />
-      </section>
-    );
+    return withLeave(<VoteResultReveal room={liveRoom} />);
   }
 
   // --- Final guess ---------------------------------------------------------
   if (liveRoom.phase === "final-guess") {
-    return (
-      <section className="flex flex-col gap-4">
-        <FinalGuess room={liveRoom} />
-      </section>
-    );
+    return withLeave(<FinalGuess room={liveRoom} />);
   }
 
   // --- Game over -----------------------------------------------------------
   if (liveRoom.phase === "game-over") {
-    return (
-      <section className="flex flex-col gap-4">
-        <WinnerReveal room={liveRoom} />
-      </section>
-    );
+    return withLeave(<WinnerReveal room={liveRoom} />);
   }
 
   // --- Lobby phase ---------------------------------------------------------

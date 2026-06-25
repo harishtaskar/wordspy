@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CHAT_MAX_LENGTH, type RoomSummary } from "@wordspy/types";
+import { CATEGORY_LABELS, CHAT_MAX_LENGTH, type RoomSummary } from "@wordspy/types";
 import { Timer } from "./Timer";
 import { Avatar, avatarTint } from "./Avatar";
 import { getSocket } from "@/lib/socket";
@@ -14,7 +14,10 @@ export function Discussion({ room }: { room: RoomSummary }) {
   const messages = useChatStore((s) => s.messages);
   const myId = useConnectionStore((s) => s.socketId);
   const [draft, setDraft] = useState("");
-  const eliminated = room.players.find((p) => p.id === myId)?.isEliminated ?? false;
+  const me = room.players.find((p) => p.id === myId);
+  const isSpectator = me?.isSpectator ?? false;
+  // Eliminated players and mid-match spectators both watch read-only.
+  const spectating = (me?.isEliminated ?? false) || isSpectator;
 
   // Auto-scroll the chat panel to the newest message.
   const feedRef = useRef<HTMLDivElement>(null);
@@ -38,7 +41,7 @@ export function Discussion({ room }: { room: RoomSummary }) {
           Round {room.round}
         </span>
         <span className="border-2 border-ink px-2 py-[2px] text-[10px] font-extrabold uppercase">
-          {room.settings.category}
+          {CATEGORY_LABELS[room.settings.category]}
         </span>
       </div>
 
@@ -78,12 +81,12 @@ export function Discussion({ room }: { room: RoomSummary }) {
             })}
           </div>
 
-          {eliminated ? (
+          {spectating ? (
             <p
               role="status"
               className="border-[3px] border-ink bg-imposter px-3 py-2 text-center text-[12px] font-extrabold uppercase text-white"
             >
-              Spectating — you&apos;re out
+              {isSpectator ? "Spectating — you play next round" : "Spectating — you're out"}
             </p>
           ) : (
             <div className="flex items-stretch gap-2 border-[3px] border-ink bg-surface p-2">

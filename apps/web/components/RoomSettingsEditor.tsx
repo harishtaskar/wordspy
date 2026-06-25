@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
   CATEGORIES,
+  CATEGORY_LABELS,
   DISCUSSION_TIMES,
   MAX_PLAYERS_OPTIONS,
+  type Category,
   type RoomSettings,
   type RoomSummary,
   type AckResponse,
@@ -87,7 +89,7 @@ export function RoomSettingsEditor({ room, onClose }: { room: RoomSummary; onClo
           Room Settings
         </h2>
 
-        <OptionRow label="Category" options={CATEGORIES} value={settings.category} onPick={(category) => patch({ category })} />
+        <OptionRow label="Category" options={CATEGORIES} value={settings.category} onPick={(category) => patch({ category })} fmt={(v) => CATEGORY_LABELS[v as Category]} />
         <OptionRow
           label="Discussion time"
           options={DISCUSSION_TIMES}

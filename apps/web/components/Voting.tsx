@@ -12,14 +12,16 @@ import { useConnectionStore } from "@/store/connection";
 export function Voting({ room }: { room: RoomSummary }) {
   const myId = useConnectionStore((s) => s.socketId);
   const me = room.players.find((p) => p.id === myId);
-  const active = room.players.filter((p) => !p.isEliminated);
+  const active = room.players.filter((p) => !p.isEliminated && !p.isSpectator);
   const targets = active.filter((p) => p.id !== myId);
 
   const [selected, setSelected] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const eliminated = me?.isEliminated ?? false;
+  const isSpectator = me?.isSpectator ?? false;
+  // Eliminated players and mid-match spectators both watch the vote read-only.
+  const spectating = (me?.isEliminated ?? false) || isSpectator;
 
   // A new voting round (incl. a re-vote after a tie) resets the count to 0 —
   // unlock and clear the selection so the player can vote again.
@@ -54,14 +56,14 @@ export function Voting({ room }: { room: RoomSummary }) {
     </div>
   );
 
-  if (eliminated) {
+  if (spectating) {
     return (
       <section className="flex flex-col gap-3">
         <h2 className="text-[22px] uppercase leading-none tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
           Vote
         </h2>
         <p role="status" className="border-[3px] border-ink bg-imposter px-3 py-2 text-center text-[12px] font-extrabold uppercase text-white">
-          Spectating — you&apos;re out
+          {isSpectator ? "Spectating — you play next round" : "Spectating — you're out"}
         </p>
         {progress}
       </section>

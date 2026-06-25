@@ -30,6 +30,8 @@ export interface Player {
   eliminated: boolean;
   /** Round in which this player was eliminated (for scoring). */
   eliminatedRound?: number;
+  /** Joined mid-match — watch-only, no role; promoted to a full player next match. */
+  pending?: boolean;
   /** Match score, computed at game-over. */
   score: number;
   /** Stable avatar palette index (distinct per player within the room). */
@@ -132,14 +134,18 @@ export type AddPlayerResult =
   | { ok: true; room: Room }
   | { ok: false; error: string };
 
-/** Add a non-host player to a room, enforcing lobby/capacity/duplicate rules. */
+/**
+ * Add a non-host player to a room, enforcing capacity/duplicate rules. Joining
+ * is allowed in any phase as long as a seat is free — a player who joins after
+ * the match has started becomes a watch-only spectator (`pending`) and is
+ * promoted to a full player on the next match (see `resetForRematch`).
+ */
 export function addPlayer(
   code: string,
   player: { id: string; username: string; sessionId?: string },
 ): AddPlayerResult {
   const room = rooms.get(code);
   if (!room) return { ok: false, error: "Room not found." };
-  if (room.phase !== "lobby") return { ok: false, error: "Game already started." };
   if (room.players.has(player.id)) return { ok: true, room }; // idempotent re-join by same socket
   if (room.players.size >= room.settings.maxPlayers) return { ok: false, error: "Room full." };
 
@@ -155,6 +161,7 @@ export function addPlayer(
     isHost: false,
     isReady: false,
     eliminated: false,
+    pending: room.phase !== "lobby", // mid-match join → spectate, play next match
     score: 0,
     colorIndex: nextColorIndex(room),
   });
@@ -284,28 +291,35 @@ export function setReady(code: string, id: string, ready: boolean): Room | undef
 
 const PUBLIC_LIST_CAP = 50;
 
-/** Joinable public rooms: not private, still in the lobby, not full. Newest first. */
+/**
+ * All public rooms, newest first — the browser shows every public room (lobby,
+ * in-progress, or full) and derives the status/seat info client-side. Private
+ * rooms stay hidden.
+ */
 export function listPublicRooms(): PublicRoomInfo[] {
   const out: PublicRoomInfo[] = [];
   for (const room of rooms.values()) {
     if (room.settings.isPrivate) continue;
-    if (room.phase !== "lobby") continue;
-    if (room.players.size >= room.settings.maxPlayers) continue;
     out.push({
       code: room.code,
       hostName: room.players.get(room.hostId)?.username ?? "—",
       players: room.players.size,
       maxPlayers: room.settings.maxPlayers,
       category: room.settings.category,
+      phase: room.phase,
+      round: room.round,
     });
   }
   out.sort((a, b) => (rooms.get(b.code)?.createdAt ?? 0) - (rooms.get(a.code)?.createdAt ?? 0));
   return out.slice(0, PUBLIC_LIST_CAP);
 }
 
-/** Active (non-eliminated) players — the eligible voters/targets. */
+/**
+ * Active players — the eligible voters/targets for the current match. Excludes
+ * both eliminated players and mid-match spectators (`pending`).
+ */
 export function activePlayers(room: Room): Player[] {
-  return [...room.players.values()].filter((p) => !p.eliminated);
+  return [...room.players.values()].filter((p) => !p.eliminated && !p.pending);
 }
 
 export type CastVoteResult = { ok: true; room: Room } | { ok: false; error: string };
@@ -320,12 +334,12 @@ export function castVote(code: string, voterId: string, targetId: string): CastV
   if (room.phase !== "voting") return { ok: false, error: "Not voting right now." };
 
   const voter = room.players.get(voterId);
-  if (!voter || voter.eliminated) return { ok: false, error: "You can't vote." };
+  if (!voter || voter.eliminated || voter.pending) return { ok: false, error: "You can't vote." };
   if (room.votes.has(voterId)) return { ok: false, error: "You already voted." };
 
   if (targetId === voterId) return { ok: false, error: "You can't vote for yourself." };
   const target = room.players.get(targetId);
-  if (!target || target.eliminated) return { ok: false, error: "Invalid target." };
+  if (!target || target.eliminated || target.pending) return { ok: false, error: "Invalid target." };
 
   room.votes.set(voterId, targetId);
   return { ok: true, room };
@@ -451,6 +465,7 @@ export function resetForRematch(room: Room): void {
   for (const p of room.players.values()) {
     p.eliminated = false;
     p.eliminatedRound = undefined;
+    p.pending = false; // mid-match spectators join the next match as full players
     p.role = undefined;
     p.isReady = false;
     if (p.disconnectTimer) clearTimeout(p.disconnectTimer);
@@ -523,6 +538,7 @@ export function toSummary(room: Room): RoomSummary {
     isHost: p.isHost,
     isReady: p.isReady,
     isEliminated: p.eliminated,
+    isSpectator: !!p.pending,
     score: p.score,
     colorIndex: p.colorIndex,
     isConnected: !p.disconnected,

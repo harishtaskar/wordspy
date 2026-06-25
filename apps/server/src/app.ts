@@ -95,6 +95,7 @@ function scheduleNextPhase(room: Room, io: GameIOServer): void {
       scheduleNextPhase(current, io);
     }
     io.to(current.code).emit("room:state", toSummary(current));
+    broadcastPublicRooms(io); // status/round changed → refresh the browser
   }, plan.durationMs);
   // Don't let a pending phase timer keep the process (or a test runner) alive.
   room.timer.unref?.();
@@ -109,6 +110,7 @@ function startVotingTimer(room: Room, io: GameIOServer): void {
     if (!current || current.phase !== "voting") return;
     resolveVotingRound(current, io);
     io.to(current.code).emit("room:state", toSummary(current));
+    broadcastPublicRooms(io);
   }, VOTE_MS);
   room.timer.unref?.();
 }
@@ -154,6 +156,7 @@ function scheduleResultAdvance(room: Room, io: GameIOServer): void {
       if (current.voteResult?.wasImposter) startFinalGuess(current, io);
     }
     io.to(current.code).emit("room:state", toSummary(current));
+    broadcastPublicRooms(io);
   }, RESULT_REVEAL_MS);
   room.timer.unref?.();
 }
@@ -170,6 +173,7 @@ function startFinalGuess(room: Room, io: GameIOServer): void {
     if (!current || current.phase !== "final-guess") return;
     setWinner(current, "crew"); // ran out of time → Crew wins
     io.to(current.code).emit("room:state", toSummary(current));
+    broadcastPublicRooms(io);
   }, FINAL_GUESS_MS);
   room.timer.unref?.();
 }
@@ -462,7 +466,10 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       const room = result.room;
 
       // --- Role assignment + per-socket secret distribution (Story 2.2) ---
-      const playerIds = [...room.players.keys()];
+      // Only active players take part; mid-match spectators (pending) get no role
+      // and never receive the word.
+      const participants = [...room.players.values()].filter((p) => !p.pending);
+      const playerIds = participants.map((p) => p.id);
       const { imposterId } = assignRoles(playerIds);
       const word = pickWord(room.settings.category, room.usedWords).word;
       const category = room.settings.category;
@@ -470,7 +477,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       room.secretWord = word;
       room.imposterId = imposterId;
       room.imposterUsername = room.players.get(imposterId)?.username;
-      for (const p of room.players.values()) {
+      for (const p of participants) {
         p.role = p.id === imposterId ? "imposter" : "crew";
       }
 
@@ -481,9 +488,10 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       const summary = toSummary(room); // secret-free: no role/word/imposterId
       if (typeof ack === "function") ack({ ok: true, data: summary });
 
-      // Emit the role to EACH socket individually. The Imposter payload is built
-      // WITHOUT a `word` key — the word never reaches the Imposter on the wire.
-      for (const p of room.players.values()) {
+      // Emit the role to EACH participant socket individually. The Imposter
+      // payload is built WITHOUT a `word` key — the word never reaches the
+      // Imposter on the wire. Spectators (pending) are skipped: no role, no word.
+      for (const p of participants) {
         const target = io.sockets.sockets.get(p.id);
         if (!target) continue;
         if (p.id === imposterId) {
@@ -502,11 +510,19 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
     });
 
     const leaveRoom = (code: string) => {
-      const result = removePlayer(code, socket.id);
+      const room = getRoom(code);
+      const inProgress = !!room && room.phase !== "lobby" && room.phase !== "game-over";
       socket.leave(code);
+      if (inProgress) {
+        // Leaving mid-match is treated exactly like a permanent disconnect: an
+        // imposter who quits hands Crew the win; a departing voter may unblock
+        // the round. finalizeDeparture removes the player and broadcasts.
+        finalizeDeparture(code, socket.id, io);
+        console.log(`[room] ${socket.id} left ${code} mid-match`);
+        return;
+      }
+      const result = removePlayer(code, socket.id);
       if (!result.deleted && result.room) {
-        // A departing voter may have completed (or unblocked) the round.
-        maybeResolveVoting(result.room, io);
         io.to(code).emit("room:state", toSummary(result.room));
         console.log(`[room] ${socket.id} left ${code}; host=${result.room.hostId}`);
       } else {
@@ -525,7 +541,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       const room = getRoom(code);
       const player = room?.players.get(socket.id);
       if (!room || !player) return; // not a member of this room
-      if (player.eliminated) return; // eliminated players spectate, no chat
+      if (player.eliminated || player.pending) return; // spectators watch only, no chat
       if (room.phase !== "discussion") return; // chat is a discussion-phase activity
 
       const raw = (typeof req?.text === "string" ? req.text : "").trim().slice(0, CHAT_MAX_LENGTH);
@@ -558,6 +574,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       const summary = toSummary(room);
       if (typeof ack === "function") ack({ ok: true, data: summary });
       io.to(code).emit("room:state", summary);
+      broadcastPublicRooms(io); // a resolved round may have changed status/round
     });
 
     socket.on("guess:submit", (req, ack) => {
@@ -577,6 +594,7 @@ export function createApp(options: CreateAppOptions = {}): AppHandles {
       const summary = toSummary(room); // phase game-over, winner set
       if (typeof ack === "function") ack({ ok: true, data: summary });
       io.to(code).emit("room:state", summary);
+      broadcastPublicRooms(io); // → game-over status in the browser
       console.log(`[room] ${code} final guess ${res.correct ? "CORRECT (imposter steals)" : "wrong (crew win)"}`);
     });
 

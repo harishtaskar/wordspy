@@ -6,13 +6,13 @@ afterEach(cleanup);
 
 describe("RoleBanner", () => {
   it("shows the secret word to crew", () => {
-    render(<RoleBanner role={{ role: "crew", word: "Mango", category: "food" }} />);
+    render(<RoleBanner role={{ role: "crew", word: "Mango", category: "world-food" }} />);
     expect(screen.getByText("Mango")).toBeTruthy();
     expect(screen.getByText(/drop a clue/i)).toBeTruthy();
   });
 
   it("never renders a word for the imposter", () => {
-    render(<RoleBanner role={{ role: "imposter", category: "food" }} />);
+    render(<RoleBanner role={{ role: "imposter", category: "world-food" }} />);
     expect(screen.getByText(/guess the word/i)).toBeTruthy();
     expect(screen.getByText(/imposter/i)).toBeTruthy();
   });

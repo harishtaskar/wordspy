@@ -9,7 +9,7 @@ const replace = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, push: vi.fn() }) }));
 
 let publicList = [
-  { code: "ABCDE", hostName: "Aanya", players: 2, maxPlayers: 8, category: "food" as const },
+  { code: "ABCDE", hostName: "Aanya", players: 2, maxPlayers: 8, category: "world-food" as const, phase: "lobby" as const, round: 1 },
 ];
 const joinedRoom: RoomSummary = {
   code: "ABCDE",
@@ -19,7 +19,7 @@ const joinedRoom: RoomSummary = {
   revote: false,
   settings: DEFAULT_ROOM_SETTINGS,
   hostId: "host",
-  players: [{ id: "s1", username: "Mo", isHost: false, isReady: false, isEliminated: false, score: 0, colorIndex: 0 }],
+  players: [{ id: "s1", username: "Mo", isHost: false, isReady: false, isEliminated: false, isSpectator: false, score: 0, colorIndex: 0 }],
 };
 
 const emit = vi.fn((event: string, a?: unknown, b?: unknown) => {
@@ -31,7 +31,7 @@ vi.mock("@/lib/socket", () => ({ getSocket: () => ({ emit, on: vi.fn(), off: vi.
 beforeEach(() => {
   replace.mockReset();
   emit.mockClear(); // keep the implementation, just reset call history
-  publicList = [{ code: "ABCDE", hostName: "Aanya", players: 2, maxPlayers: 8, category: "food" }];
+  publicList = [{ code: "ABCDE", hostName: "Aanya", players: 2, maxPlayers: 8, category: "world-food", phase: "lobby", round: 1 }];
   usePlayerSession.setState({ sessionId: "s1", username: "Mo" });
   useRoomStore.setState({ room: null });
 });

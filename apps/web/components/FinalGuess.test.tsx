@@ -27,7 +27,7 @@ const room: RoomSummary = {
 
 describe("FinalGuess", () => {
   it("imposter sees an input and emits guess:submit", () => {
-    useRoleStore.setState({ role: { role: "imposter", category: "food" } });
+    useRoleStore.setState({ role: { role: "imposter", category: "world-food" } });
     render(<FinalGuess room={room} />);
     const input = screen.getByLabelText(/final guess/i) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Pizza" } });
@@ -40,7 +40,7 @@ describe("FinalGuess", () => {
   });
 
   it("crew sees the waiting state, no input", () => {
-    useRoleStore.setState({ role: { role: "crew", word: "Pizza", category: "food" } });
+    useRoleStore.setState({ role: { role: "crew", word: "Pizza", category: "world-food" } });
     render(<FinalGuess room={room} />);
     expect(screen.getByText(/they're guessing/i)).toBeTruthy();
     expect(screen.queryByLabelText(/final guess/i)).toBeNull();

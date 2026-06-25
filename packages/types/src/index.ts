@@ -56,8 +56,10 @@ export interface HeartbeatAck {
 // ---- Rooms (Story 1.3) ----------------------------------------------------
 
 export const CATEGORIES = [
-  "food",
-  "movies",
+  "world-food",
+  "indian-food",
+  "world-movies",
+  "indian-movies",
   "animals",
   "countries",
   "sports",
@@ -65,6 +67,23 @@ export const CATEGORIES = [
   "random",
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
+
+/**
+ * Human-readable pack labels — the single source of truth for how a category id
+ * is shown in the UI. Data-driven: adding a pack means adding an id to
+ * `CATEGORIES`, a label here, and a word list server-side. No UI logic changes.
+ */
+export const CATEGORY_LABELS: Record<Category, string> = {
+  "world-food": "World Food",
+  "indian-food": "Indian Food",
+  "world-movies": "World Movies",
+  "indian-movies": "Indian Movies",
+  animals: "Animals",
+  countries: "Countries",
+  sports: "Sports",
+  technology: "Technology",
+  random: "Random",
+};
 
 export const DISCUSSION_TIMES = [60, 90, 120] as const;
 export type DiscussionSeconds = (typeof DISCUSSION_TIMES)[number];
@@ -112,7 +131,7 @@ export interface VoteResult {
 }
 
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
-  category: "food",
+  category: "world-food",
   discussionSeconds: 90,
   maxPlayers: 8,
   isPrivate: true,
@@ -135,6 +154,8 @@ export interface PlayerSummary {
   isEliminated: boolean;
   /** Match score (computed at game-over). */
   score: number;
+  /** Joined mid-match — watching only; auto-plays the next match. */
+  isSpectator: boolean;
   /** Stable avatar palette index (distinct per player). */
   colorIndex: number;
   /** False while the player is mid-disconnect (within the reconnect grace window). Absent ⇒ connected. */
@@ -188,6 +209,10 @@ export interface PublicRoomInfo {
   players: number;
   maxPlayers: number;
   category: Category;
+  /** Current lifecycle phase — the browser derives Waiting / In Progress / Full. */
+  phase: RoomPhase;
+  /** Current round (1-based), shown when a match is in progress. */
+  round: number;
 }
 
 export interface JoinRoomRequest {
